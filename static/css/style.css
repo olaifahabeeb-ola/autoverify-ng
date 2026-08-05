@@ -1,0 +1,559 @@
+/* ============================================================
+   AutoVerify NG — Design tokens
+   Clean, professional, friendly light theme.
+   ============================================================ */
+:root {
+  --av-primary: #2e7d32;
+  --av-primary-light: #4caf50;
+  --av-primary-dark: #1b5e20;
+  --av-primary-soft: #e8f5e9;
+
+  --av-white: #ffffff;
+  --av-bg: #f5f7fa;
+
+  --av-border: #e2e6ea;
+  --av-border-strong: #d3d9df;
+
+  --av-text: #333333;
+  --av-text-muted: #6b7280;
+  --av-text-faint: #9aa3ad;
+
+  --av-amber-bg: #fff3e0;
+  --av-amber-text: #e65100;
+  --av-red-bg: #ffebee;
+  --av-red-text: #c62828;
+  --av-green-bg: #e8f5e9;
+  --av-green-text: #2e7d32;
+  --av-grey-bg: #eceff1;
+  --av-grey-text: #546e7a;
+
+  --av-radius: 10px;
+  --av-radius-sm: 8px;
+  --av-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --av-shadow-hover: 0 4px 14px rgba(0, 0, 0, 0.10);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--av-bg);
+  color: var(--av-text);
+  min-height: 100vh;
+  font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.55;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  color: var(--av-text);
+}
+
+a {
+  color: var(--av-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--av-primary-dark);
+  text-decoration: underline;
+}
+
+/* Main content grows to push the footer down on short pages */
+.container-fluid.py-4 {
+  flex: 1 0 auto;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ---------- Navbar ---------- */
+.av-navbar {
+  background: var(--av-white);
+  border-bottom: 1px solid var(--av-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.navbar-brand {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--av-text) !important;
+}
+
+.navbar-brand .text-danger {
+  color: var(--av-primary) !important;
+}
+
+.nav-link {
+  color: var(--av-text-muted) !important;
+  font-weight: 500;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: var(--av-primary) !important;
+}
+
+.nav-link.active::after,
+.nav-link:hover::after {
+  content: "";
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: -2px;
+  height: 2px;
+  background: var(--av-primary);
+  border-radius: 2px;
+}
+
+.navbar-toggler {
+  border-color: var(--av-border) !important;
+}
+
+/* ---------- Cards ---------- */
+.av-card {
+  background: var(--av-white);
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius);
+  box-shadow: var(--av-shadow);
+}
+
+.av-card .card-header {
+  background: var(--av-white);
+  border-bottom: 1px solid var(--av-border);
+  border-radius: var(--av-radius) var(--av-radius) 0 0;
+  font-weight: 600;
+  color: var(--av-text);
+  padding: 0.9rem 1.1rem;
+}
+
+.av-card .card-body {
+  color: var(--av-text);
+}
+
+/* ---------- Stat cards ---------- */
+.stat-card {
+  background: var(--av-white);
+  border: 1px solid var(--av-border);
+  border-left: 4px solid var(--av-primary);
+  border-radius: var(--av-radius);
+  box-shadow: var(--av-shadow);
+  padding: 1.25rem;
+  height: 100%;
+  transition: box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  box-shadow: var(--av-shadow-hover);
+}
+
+.stat-card .stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--av-text);
+}
+
+.stat-card .stat-label {
+  color: var(--av-text-muted);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.stat-card i {
+  color: var(--av-text-faint);
+}
+
+.stat-card.stat-danger {
+  border-left-color: var(--av-red-text);
+}
+
+.stat-card.stat-ok {
+  border-left-color: var(--av-primary);
+}
+
+.stat-card.stat-warn {
+  border-left-color: var(--av-amber-text);
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  border-radius: var(--av-radius-sm);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-av-primary {
+  background: var(--av-primary);
+  border-color: var(--av-primary);
+  color: #fff;
+}
+
+.btn-av-primary:hover {
+  background: var(--av-primary-dark);
+  border-color: var(--av-primary-dark);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(46, 125, 50, 0.25);
+}
+
+.btn-av-outline {
+  background: transparent;
+  border: 1px solid var(--av-primary);
+  color: var(--av-primary);
+}
+
+.btn-av-outline:hover {
+  background: var(--av-primary-soft);
+  color: var(--av-primary-dark);
+  border-color: var(--av-primary-dark);
+}
+
+/* ---------- Forms ---------- */
+.form-control, .form-select {
+  background: var(--av-white);
+  border: 1px solid var(--av-border-strong);
+  color: var(--av-text);
+  border-radius: var(--av-radius-sm);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+  background: var(--av-white);
+  color: var(--av-text);
+  border-color: var(--av-primary-light);
+  box-shadow: 0 0 0 0.2rem rgba(76, 175, 80, 0.18);
+}
+
+.form-control::placeholder {
+  color: var(--av-text-faint);
+}
+
+label, .form-label {
+  color: var(--av-text);
+  font-weight: 500;
+}
+
+.form-text {
+  color: var(--av-text-muted);
+  font-size: 0.82rem;
+}
+
+/* ---------- Tables ---------- */
+.table {
+  color: var(--av-text);
+  margin-bottom: 0;
+}
+
+.table thead {
+  background: var(--av-primary);
+}
+
+.table > thead > tr > th {
+  background-color: var(--av-primary) !important;
+  color: #fff !important;
+  font-weight: 600;
+  border-bottom: none;
+  white-space: nowrap;
+  box-shadow: none !important;
+}
+
+.table > :not(caption) > * > * {
+  border-bottom-color: var(--av-border);
+  color: var(--av-text);
+}
+
+.table-hover > tbody > tr:hover > * {
+  background-color: var(--av-primary-soft);
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+  background-color: var(--av-bg);
+}
+
+/* ---------- Badges / status ---------- */
+.badge {
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.4em 0.8em;
+  font-size: 0.75rem;
+}
+
+.badge-stolen {
+  background: var(--av-red-bg);
+  color: var(--av-red-text);
+}
+
+.badge-mismatch {
+  background: var(--av-amber-bg);
+  color: var(--av-amber-text);
+}
+
+.badge-clear {
+  background: var(--av-green-bg);
+  color: var(--av-green-text);
+}
+
+.badge-unregistered {
+  background: var(--av-grey-bg);
+  color: var(--av-grey-text);
+}
+
+/* ---------- Verify result panel ---------- */
+.verify-result {
+  background: var(--av-white);
+  border: 1px solid var(--av-border);
+  border-left: 6px solid var(--av-border-strong);
+  border-radius: var(--av-radius);
+  box-shadow: var(--av-shadow);
+  padding: 1.5rem;
+}
+
+.verify-result.status-stolen {
+  border-left-color: var(--av-red-text);
+}
+
+.verify-result.status-mismatch {
+  border-left-color: var(--av-amber-text);
+}
+
+.verify-result.status-clear {
+  border-left-color: var(--av-primary);
+}
+
+.verify-result.status-unregistered {
+  border-left-color: var(--av-grey-text);
+}
+
+/* ---------- Camera / scan area ---------- */
+.camera-dropzone {
+  border: 2px dashed var(--av-border-strong);
+  border-radius: var(--av-radius);
+  background: var(--av-bg);
+  padding: 1.5rem;
+  transition: border-color 0.2s ease;
+}
+
+.camera-dropzone:hover {
+  border-color: var(--av-primary-light);
+}
+
+#camera-video, #camera-canvas {
+  width: 100%;
+  max-width: 520px;
+  border-radius: var(--av-radius-sm);
+  border: 1px solid var(--av-border-strong);
+  background: #0d0d0d;
+}
+
+/* ---------- Login / register panels ---------- */
+.auth-wrapper {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* ---------- Footer ---------- */
+.av-footer {
+  background: var(--av-bg);
+  color: var(--av-text-muted);
+  border-top: 1px solid var(--av-border);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.section-title {
+  border-left: 4px solid var(--av-primary);
+  padding-left: 0.6rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+/* ==================================================================
+   Full-screen priority alert overlay
+   Kept intentionally strong/high-contrast (not the soft palette) since
+   this is a safety-critical interruption that needs maximum visibility
+   in bright daylight field conditions — everyday UI stays soft/calm.
+   ================================================================== */
+.full-alert-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #fff;
+  animation: alert-flash 0.9s infinite;
+}
+
+.full-alert-overlay.alert-stolen {
+  background: rgba(198, 40, 40, 0.97);
+}
+
+.full-alert-overlay.alert-mismatch {
+  background: rgba(230, 81, 0, 0.97);
+}
+
+.full-alert-content {
+  padding: 2rem;
+}
+
+.full-alert-content h1 {
+  font-size: clamp(1.8rem, 6vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+@keyframes alert-flash {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.2); }
+}
+
+/* ---------- Offline banner ---------- */
+#offline-banner {
+  border-color: var(--av-amber-text);
+  background: var(--av-amber-bg);
+  color: var(--av-amber-text);
+  border-radius: var(--av-radius-sm);
+}
+
+/* ==================================================================
+   Mobile responsiveness — officers use phones in the field
+   ================================================================== */
+@media (max-width: 767.98px) {
+  body {
+    font-size: 1.02rem;
+  }
+
+  .btn-lg, .btn-av-primary, .btn-av-outline {
+    min-height: 48px;
+    font-size: 1.05rem;
+  }
+
+  #camera-video, #camera-canvas {
+    max-width: 100%;
+  }
+
+  .stat-card {
+    padding: 1rem;
+  }
+
+  .stat-card .stat-value {
+    font-size: 1.6rem;
+  }
+
+  .table-responsive table {
+    font-size: 0.85rem;
+  }
+
+  .full-alert-content h1 {
+    font-size: 1.6rem;
+  }
+
+  .full-alert-content i {
+    font-size: 3rem !important;
+  }
+
+  .navbar-brand {
+    font-size: 1.1rem;
+  }
+
+  .section-title {
+    font-size: 1.2rem;
+  }
+
+  .container-fluid {
+    padding-left: 0.85rem !important;
+    padding-right: 0.85rem !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .d-flex.flex-wrap.gap-2.mb-4 > a {
+    flex: 1 1 100%;
+  }
+}
+
+/* ==================================================================
+   Multi-vehicle scrollable result list
+   ================================================================== */
+.vehicle-result-list {
+  max-height: 720px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.vehicle-result-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.vehicle-result-list::-webkit-scrollbar-track {
+  background: var(--av-bg);
+}
+
+.vehicle-result-list::-webkit-scrollbar-thumb {
+  background: var(--av-border-strong);
+  border-radius: 4px;
+}
+
+/* ==================================================================
+   Batch upload progress bar
+   ================================================================== */
+.progress {
+  background: var(--av-bg);
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius-sm);
+}
+
+.progress-bar.bg-danger {
+  background-color: var(--av-primary) !important;
+}
+
+/* ==================================================================
+   Print-friendly analytics export (browser print -> PDF)
+   ================================================================== */
+@media print {
+  .av-navbar, .av-footer, .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  .av-card {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+}
+
+/* ==================================================================
+   Landing page hero section
+   ================================================================== */
+.hero-section {
+  border-bottom: 1px solid var(--av-border);
+}
+
+.hero-title {
+  font-size: clamp(2.2rem, 6vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.hero-tagline {
+  font-size: clamp(1rem, 2.5vw, 1.3rem);
+  color: var(--av-text-muted);
+  max-width: 640px;
+  margin: 0 auto;
+}

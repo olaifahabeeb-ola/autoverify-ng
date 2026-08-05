@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Alert Log - AutoVerify NG{% endblock %}
+{% block content %}
+
+<h3 class="section-title"><i class="fa-solid fa-bell"></i> Simulated Alert Log</h3>
+
+<p class="text-muted">
+  Every STOLEN or MISMATCH result dispatches a priority alert (console +
+  <code>alerts.log</code>, or real email if configured). This page shows the
+  full history for demo/audit purposes.
+</p>
+
+<div class="av-card">
+  <div class="card-header">
+    <i class="fa-solid fa-list"></i> Alert History ({{ alerts|length }})
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-striped mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Plate</th>
+            <th>Alert Type</th>
+            <th>Recipient</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in alerts %}
+          <tr>
+            <td>{{ a.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td><strong>{{ a.plate_number }}</strong></td>
+            <td>
+              {% if a.alert_type == 'stolen' %}
+                <span class="badge badge-stolen">STOLEN</span>
+              {% else %}
+                <span class="badge badge-mismatch">MISMATCH</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if a.channel == 'email' %}
+                {{ alert_recipient }}
+              {% else %}
+                Control Room (console dispatch)
+              {% endif %}
+            </td>
+            <td>
+              {% if a.delivered %}
+                <span class="badge bg-success">Delivered</span>
+              {% else %}
+                <span class="badge bg-secondary">Logged (console/file)</span>
+              {% endif %}
+              <span class="badge bg-info text-dark">{{ a.channel }}</span>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-4">No alerts dispatched yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

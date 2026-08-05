@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}My Vehicle - AutoVerify NG{% endblock %}
+{% block content %}
+
+<h3 class="section-title"><i class="fa-solid fa-car"></i> My Vehicle</h3>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="av-card p-4">
+      <div class="text-center mb-3">
+        {% if vehicle.image_path %}
+          <img src="{{ url_for('static', filename=vehicle.image_path) }}" class="img-fluid rounded" style="max-height:200px;">
+        {% else %}
+          <i class="fa-solid fa-car fa-4x text-muted"></i>
+        {% endif %}
+      </div>
+      <table class="table table-sm">
+        <tr><th>Plate Number</th><td>{{ vehicle.plate_number }}</td></tr>
+        <tr><th>Make / Model</th><td>{{ vehicle.make }} {{ vehicle.model }}</td></tr>
+        <tr><th>Year</th><td>{{ vehicle.year }}</td></tr>
+        <tr><th>Colour</th><td>{{ vehicle.colour }}</td></tr>
+        <tr><th>Owner</th><td>{{ vehicle.owner_name }}</td></tr>
+        <tr><th>Phone</th><td>{{ vehicle.owner_phone }}</td></tr>
+        <tr><th>Registered</th><td>{{ vehicle.registered_at.strftime('%Y-%m-%d') }}</td></tr>
+      </table>
+    </div>
+
+    <div class="av-card p-4 mt-3">
+      <h6 class="mb-3" style="color: var(--av-primary);"><i class="fa-solid fa-flag"></i> File a Report</h6>
+      <form method="POST" action="{{ url_for('owner_report') }}">
+        <div class="mb-3">
+          <label class="form-label">Report Type</label>
+          <select name="report_type" class="form-select" required>
+            <option value="stolen">🚨 Stolen</option>
+            <option value="ownership_change">🔄 Change of Ownership</option>
+            <option value="written_off">🗑️ Vehicle Written Off</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="Additional details..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-av-primary w-100">Submit Report</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="av-card">
+      <div class="card-header"><i class="fa-solid fa-clock-rotate-left"></i> Report History</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead>
+              <tr><th>Date</th><th>Type</th><th>Description</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {% for r in reports %}
+              <tr>
+                <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                  {% if r.report_type == 'stolen' %}
+                    <span class="badge badge-stolen">Stolen</span>
+                  {% elif r.report_type == 'ownership_change' %}
+                    <span class="badge bg-info text-dark">Ownership Change</span>
+                  {% else %}
+                    <span class="badge bg-secondary">Written Off</span>
+                  {% endif %}
+                </td>
+                <td>{{ r.description or '-' }}</td>
+                <td>
+                  {% if r.is_active %}
+                    <span class="badge bg-warning text-dark">Active</span>
+                  {% else %}
+                    <span class="badge bg-success">Resolved</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="text-center text-muted py-4">No reports filed yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

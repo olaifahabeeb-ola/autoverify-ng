@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Owner Login - AutoVerify NG{% endblock %}
+{% block content %}
+
+<div class="auth-wrapper py-4">
+  <div class="text-center mb-3">
+    <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-2"
+         style="width:56px;height:56px;background:var(--av-primary-soft);">
+      <i class="fa-solid fa-right-to-bracket fa-lg" style="color: var(--av-primary);"></i>
+    </div>
+    <h3 class="mb-0">Owner Login</h3>
+    <p class="text-muted small">Sign in to manage your registered vehicle</p>
+  </div>
+
+  <div class="av-card p-4">
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label">Email Address</label>
+        <input type="email" name="email" class="form-control" required autofocus>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" required>
+      </div>
+      <button type="submit" class="btn btn-av-primary w-100"><i class="fa-solid fa-right-to-bracket"></i> Login</button>
+    </form>
+    <p class="text-center mt-3 mb-0">Don't have a vehicle registered? <a href="{{ url_for('register') }}">Register here</a></p>
+  </div>
+  <p class="text-center mt-3 mb-0 small text-muted">Demo account: chinedu@example.com / password123</p>
+</div>
+
+{% endblock %}

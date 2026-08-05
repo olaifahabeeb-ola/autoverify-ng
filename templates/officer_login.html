@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Officer Login - AutoVerify NG{% endblock %}
+{% block content %}
+
+<div class="auth-wrapper py-4">
+  <div class="text-center mb-3">
+    <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-2"
+         style="width:56px;height:56px;background:var(--av-primary-soft);">
+      <i class="fa-solid fa-user-tie fa-lg" style="color: var(--av-primary);"></i>
+    </div>
+    <h3 class="mb-0">Field Officer Login</h3>
+    <p class="text-muted small">Authorized personnel only</p>
+  </div>
+
+  <div class="av-card p-4">
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input type="text" name="username" class="form-control" required autofocus>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" required>
+      </div>
+      <button type="submit" class="btn btn-av-primary w-100"><i class="fa-solid fa-lock"></i> Secure Login</button>
+    </form>
+  </div>
+  <p class="text-center mt-3 mb-0 small text-muted">
+    Demo officer: officer1 / officer123<br>
+    Demo admin: admin / admin123
+  </p>
+</div>
+
+{% endblock %}

@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+{% block title %}Scan Vehicle - AutoVerify NG{% endblock %}
+{% block content %}
+
+<h3 class="section-title"><i class="fa-solid fa-camera"></i> Scan Vehicle</h3>
+
+<div id="offline-banner" class="alert alert-warning d-none">
+  <i class="fa-solid fa-wifi"></i> You appear to be offline. Checking captured plates against the
+  <strong>cached hotlist</strong> (last synced <span id="cache-synced-at">never</span>) until connection returns.
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="av-card camera-dropzone p-4 text-center">
+      <video id="camera-video" autoplay playsinline></video>
+      <canvas id="camera-canvas" class="d-none"></canvas>
+
+      <div class="mt-3 d-flex gap-2 justify-content-center flex-wrap">
+        <button id="start-camera" class="btn btn-av-outline btn-lg"><i class="fa-solid fa-video"></i> Start Camera</button>
+        <button id="capture-btn" class="btn btn-av-primary btn-lg" disabled><i class="fa-solid fa-camera"></i> Capture &amp; Verify</button>
+      </div>
+
+      <p class="text-muted small mt-2 mb-0">
+        <i class="fa-solid fa-circle-info"></i>
+        Automatically detects <strong>multiple vehicles</strong> in one photo (e.g. a checkpoint
+        shot with several cars) and verifies each independently. For bulk uploads, use
+        <a href="{{ url_for('batch') }}">Batch Scan</a>.
+      </p>
+
+      <form id="verify-form" method="POST" class="d-none">
+        <input type="hidden" name="image_data" id="image_data">
+        <input type="hidden" name="gps_lat" id="gps_lat">
+        <input type="hidden" name="gps_lon" id="gps_lon">
+      </form>
+
+      <hr style="border-color: var(--av-border); margin: 1.25rem 0;">
+
+      <details>
+        <summary class="text-muted small" style="cursor:pointer;">
+          <i class="fa-solid fa-keyboard"></i> Plate not reading clearly? Enter it manually
+        </summary>
+        <form id="manual-form" method="POST" class="mt-3 d-flex gap-2 justify-content-center flex-wrap">
+          <input type="hidden" name="image_data" id="manual_image_data">
+          <input type="hidden" name="gps_lat" id="manual_gps_lat">
+          <input type="hidden" name="gps_lon" id="manual_gps_lon">
+          <input type="text" name="manual_plate" class="form-control" style="max-width:220px;" required
+                 placeholder="e.g. ABC-123-XY" pattern="[A-Za-z]{3}-?\d{3}-?[A-Za-z]{2}">
+          <button type="submit" class="btn btn-av-outline">Verify Manually</button>
+        </form>
+      </details>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    {% if vehicles %}
+      {% if multi_vehicle %}
+      <p class="text-muted mb-2">
+        <i class="fa-solid fa-car-side"></i>
+        <strong>{{ vehicles|length }} vehicles detected</strong> in this photo — scroll to review each.
+      </p>
+      {% endif %}
+
+      <div class="vehicle-result-list" id="vehicle-result-list">
+        {% for v in vehicles %}
+        <div class="verify-result status-{{ v.status }} mb-3" data-status="{{ v.status }}" data-message="{{ v.message }}">
+          <h5>
+            {% if v.status == 'stolen' %}
+              <span class="badge badge-stolen mb-2">Stolen Vehicle</span>
+            {% elif v.status == 'mismatch' %}
+              <span class="badge badge-mismatch mb-2">Mismatch Detected</span>
+            {% elif v.status == 'clear' %}
+              <span class="badge badge-clear mb-2">Verified</span>
+            {% else %}
+              <span class="badge badge-unregistered mb-2">Unregistered</span>
+            {% endif %}
+            {% if multi_vehicle %}
+            <span class="badge badge-unregistered">Vehicle {{ loop.index }}</span>
+            {% endif %}
+          </h5>
+          <p class="fw-bold">{{ v.message }}</p>
+
+          {% for note in v.notes %}
+            <p class="mb-1 text-muted"><i class="fa-solid fa-note-sticky"></i> {{ note }}</p>
+          {% endfor %}
+
+          {% if v.owner_notified %}
+            <p class="mb-1 text-muted"><i class="fa-solid fa-paper-plane"></i> Owner notified (simulated SMS/email) — see Admin panel for the log.</p>
+          {% endif %}
+
+          <hr style="border-color: var(--av-border);">
+          <table class="table table-sm mb-0">
+            <tr><th>Plate Read</th><td>{{ v.plate_number }}</td></tr>
+            <tr><th>Recognized Vehicle</th><td>{{ v.recognized_colour }} {{ v.recognized_make }} {{ v.recognized_model }}</td></tr>
+            {% if v.recognition_method %}
+            <tr><th>Recognition Source</th>
+              <td>
+                {% if v.recognition_method == 'trained_model' %}
+                  <span class="badge badge-clear">Trained MobileNetV2 model</span>
+                {% else %}
+                  <span class="badge badge-unregistered">Placeholder (no trained model yet)</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endif %}
+            {% if gps_lat and gps_lon %}
+            <tr><th>Location</th>
+              <td>
+                <a href="https://maps.google.com/?q={{ gps_lat }},{{ gps_lon }}" target="_blank" rel="noopener">
+                  {{ '%.5f'|format(gps_lat|float) }}, {{ '%.5f'|format(gps_lon|float) }}
+                  <i class="fa-solid fa-up-right-from-square"></i>
+                </a>
+              </td>
+            </tr>
+            {% endif %}
+          </table>
+
+          {% if v.owner_info %}
+          <hr style="border-color: var(--av-border);">
+          <h6 style="color: var(--av-primary);"><i class="fa-solid fa-user-lock"></i> Owner Information (Authorized Officers Only)</h6>
+          <table class="table table-sm mb-0">
+            <tr><th>Name</th><td>{{ v.owner_info.name }}</td></tr>
+            <tr><th>Phone</th><td>{{ v.owner_info.phone }}</td></tr>
+            <tr><th>Email</th><td>{{ v.owner_info.email }}</td></tr>
+          </table>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="av-card p-4 h-100 d-flex align-items-center justify-content-center text-center text-muted">
+        <div>
+          <i class="fa-solid fa-clipboard-list fa-3x mb-3"></i>
+          <p>Capture a vehicle photo to see the verification result(s) here.</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- PHASE 2/3: Full-screen priority alert overlay (worst status across all detected vehicles) -->
+<div id="full-alert-overlay" class="full-alert-overlay d-none">
+  <div class="full-alert-content">
+    <i class="fa-solid fa-triangle-exclamation fa-5x mb-3"></i>
+    <h1 id="full-alert-title">ALERT</h1>
+    <p id="full-alert-message" class="fs-4"></p>
+    <button id="dismiss-alert-btn" class="btn btn-light btn-lg mt-3">
+      <i class="fa-solid fa-check"></i> Acknowledge
+    </button>
+  </div>
+</div>
+
+<audio id="alert-sound" preload="auto">
+  <source src="{{ url_for('static', filename='sounds/alert.wav') }}" type="audio/wav">
+</audio>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const video = document.getElementById('camera-video');
+const canvas = document.getElementById('camera-canvas');
+const startBtn = document.getElementById('start-camera');
+const captureBtn = document.getElementById('capture-btn');
+const form = document.getElementById('verify-form');
+const imageDataInput = document.getElementById('image_data');
+const gpsLatInput = document.getElementById('gps_lat');
+const gpsLonInput = document.getElementById('gps_lon');
+
+const manualForm = document.getElementById('manual-form');
+const manualGpsLat = document.getElementById('manual_gps_lat');
+const manualGpsLon = document.getElementById('manual_gps_lon');
+
+let stream = null;
+let lastGpsLat = null;
+let lastGpsLon = null;
+
+startBtn.addEventListener('click', async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    video.srcObject = stream;
+    captureBtn.disabled = false;
+    startBtn.textContent = "Camera Active";
+    startBtn.disabled = true;
+  } catch (err) {
+    alert("Could not access camera: " + err.message + "\nMake sure you've granted camera permission.");
+  }
+});
+
+// Try to get GPS location silently (non-blocking), refresh periodically
+function refreshGps() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      lastGpsLat = pos.coords.latitude;
+      lastGpsLon = pos.coords.longitude;
+      gpsLatInput.value = lastGpsLat;
+      gpsLonInput.value = lastGpsLon;
+      manualGpsLat.value = lastGpsLat;
+      manualGpsLon.value = lastGpsLon;
+    },
+    () => { /* location denied or unavailable - ignore */ }
+  );
+}
+refreshGps();
+setInterval(refreshGps, 15000);
+
+captureBtn.addEventListener('click', () => {
+  if (!stream) return;
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const dataUrl = canvas.toDataURL('image/png');
+  imageDataInput.value = dataUrl;
+  document.getElementById('manual_image_data').value = dataUrl;
+
+  captureBtn.disabled = true;
+  captureBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verifying...';
+
+  submitWithOfflineCheck(form, imageDataInput.value);
+});
+
+manualForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  submitWithOfflineCheck(manualForm, null);
+});
+
+// ------------------------------------------------------------------
+// PHASE 2: Offline hotlist cache (localStorage)
+// ------------------------------------------------------------------
+const HOTLIST_CACHE_KEY = 'autoverify_hotlist_cache';
+const HOTLIST_SYNCED_KEY = 'autoverify_hotlist_synced_at';
+
+async function syncHotlistCache() {
+  try {
+    const resp = await fetch('/api/hotlist');
+    if (!resp.ok) throw new Error('bad response');
+    const data = await resp.json();
+    localStorage.setItem(HOTLIST_CACHE_KEY, JSON.stringify(data.plates || []));
+    localStorage.setItem(HOTLIST_SYNCED_KEY, new Date().toISOString());
+    setOnlineBanner(false);
+  } catch (err) {
+    setOnlineBanner(true);
+  }
+}
+
+function getCachedHotlist() {
+  try {
+    return JSON.parse(localStorage.getItem(HOTLIST_CACHE_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function setOnlineBanner(offline) {
+  const banner = document.getElementById('offline-banner');
+  const syncedAt = localStorage.getItem(HOTLIST_SYNCED_KEY);
+  document.getElementById('cache-synced-at').textContent = syncedAt
+    ? new Date(syncedAt).toLocaleString() : 'never';
+  banner.classList.toggle('d-none', !offline);
+}
+
+function submitWithOfflineCheck(formEl, dataUrl) {
+  // Best-effort: if the browser is offline, we can't run server-side OCR,
+  // so just warn the officer to check the plate manually against the
+  // cached hotlist. When online, submit normally to the server which does
+  // the real OCR + database lookup.
+  if (!navigator.onLine) {
+    setOnlineBanner(true);
+    const manualPlate = formEl.querySelector('[name="manual_plate"]');
+    if (manualPlate && manualPlate.value) {
+      const plate = manualPlate.value.toUpperCase().replace(/\s/g, '');
+      const cached = getCachedHotlist().map(p => p.toUpperCase().replace(/[\s-]/g, ''));
+      if (cached.includes(plate.replace(/-/g, ''))) {
+        triggerFullAlert('stolen', `🚨 OFFLINE MATCH: ${manualPlate.value} appears on the cached stolen hotlist! Verify manually and contact control room — live confirmation will run once you're back online.`);
+        return;
+      }
+    }
+  }
+  formEl.submit();
+}
+
+window.addEventListener('online', () => syncHotlistCache());
+window.addEventListener('offline', () => setOnlineBanner(true));
+syncHotlistCache();
+
+// ------------------------------------------------------------------
+// PHASE 2/3: Full-screen alert + sound for STOLEN / MISMATCH results
+// ------------------------------------------------------------------
+function triggerFullAlert(status, message) {
+  const overlay = document.getElementById('full-alert-overlay');
+  const title = document.getElementById('full-alert-title');
+  const msgEl = document.getElementById('full-alert-message');
+  const sound = document.getElementById('alert-sound');
+
+  overlay.classList.remove('d-none', 'alert-stolen', 'alert-mismatch');
+  overlay.classList.add(status === 'stolen' ? 'alert-stolen' : 'alert-mismatch');
+  title.textContent = status === 'stolen' ? '🚨 STOLEN VEHICLE 🚨' : '⚠️ VEHICLE MISMATCH ⚠️';
+  msgEl.textContent = message;
+
+  sound.currentTime = 0;
+  sound.play().catch(() => { /* autoplay might be blocked until user interacts once */ });
+
+  if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+}
+
+document.getElementById('dismiss-alert-btn').addEventListener('click', () => {
+  const overlay = document.getElementById('full-alert-overlay');
+  const sound = document.getElementById('alert-sound');
+  overlay.classList.add('d-none');
+  sound.pause();
+});
+
+// ------------------------------------------------------------------
+// PHASE 3: Voice alerts using the Web Speech API (no extra libraries)
+// ------------------------------------------------------------------
+function speakAlert(status, count) {
+  if (!('speechSynthesis' in window)) return; // unsupported browser — silently skip
+
+  let text;
+  if (status === 'stolen') {
+    text = count > 1
+      ? `Warning! Stolen vehicle detected among ${count} vehicles scanned.`
+      : 'Warning! Stolen vehicle detected.';
+  } else if (status === 'mismatch') {
+    text = count > 1
+      ? `Warning! Plate mismatch detected among ${count} vehicles scanned.`
+      : 'Warning! Plate does not match vehicle.';
+  } else {
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+  window.speechSynthesis.cancel(); // clear any queued speech first
+  window.speechSynthesis.speak(utterance);
+}
+
+// If the page rendered with vehicle results, trigger the full-screen
+// alert + voice warning for the worst status found (stolen > mismatch).
+document.addEventListener('DOMContentLoaded', () => {
+  const cards = document.querySelectorAll('#vehicle-result-list [data-status]');
+  if (!cards.length) return;
+
+  let worstStatus = null;
+  let worstMessage = '';
+  let alertCount = 0;
+
+  cards.forEach(card => {
+    const status = card.dataset.status;
+    if (status === 'stolen' || status === 'mismatch') {
+      alertCount++;
+      if (status === 'stolen' && worstStatus !== 'stolen') {
+        worstStatus = 'stolen';
+        worstMessage = card.dataset.message;
+      } else if (status === 'mismatch' && worstStatus === null) {
+        worstStatus = 'mismatch';
+        worstMessage = card.dataset.message;
+      }
+    }
+  });
+
+  if (worstStatus) {
+    triggerFullAlert(worstStatus, worstMessage);
+    speakAlert(worstStatus, alertCount);
+  }
+});
+</script>
+{% endblock %}

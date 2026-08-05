@@ -1,0 +1,21 @@
+venv/
+__pycache__/
+*.pyc
+
+# Runtime-generated (re-created automatically on startup)
+autoverify.db
+alerts.log
+owner_notifications.log
+
+# User-uploaded content (not part of the app itself)
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Trained model (only present after running utils/train_classifier.py)
+models_ml/*.h5
+models_ml/*.json
+!models_ml/.gitkeep
+
+# OS/editor cruft
+.DS_Store
+.vscode/

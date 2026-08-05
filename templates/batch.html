@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Batch Processing - AutoVerify NG{% endblock %}
+{% block content %}
+
+<h3 class="section-title"><i class="fa-solid fa-layer-group"></i> Batch Processing</h3>
+
+<div class="av-card p-4 mb-3">
+  <form id="batch-form" method="POST" enctype="multipart/form-data">
+    <label class="form-label">Upload up to 10 vehicle photos</label>
+    <input type="file" name="images" id="batch-images" class="form-control" accept="image/*" multiple required>
+    <p class="text-muted small mt-2 mb-0">
+      <i class="fa-solid fa-circle-info"></i>
+      Each image is run through the same real OCR + vehicle recognition pipeline as the live camera scan.
+      Only the first 10 files are processed if you select more.
+    </p>
+    <div id="batch-progress" class="d-none mt-3">
+      <div class="progress" style="height: 22px;">
+        <div id="batch-progress-bar" class="progress-bar bg-danger" role="progressbar" style="width: 100%">
+          Processing images, please wait...
+        </div>
+      </div>
+    </div>
+    <button type="submit" id="batch-submit-btn" class="btn btn-av-primary btn-lg mt-3">
+      <i class="fa-solid fa-upload"></i> Process Batch
+    </button>
+  </form>
+</div>
+
+{% if batch_results %}
+<div class="av-card">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="fa-solid fa-table-list"></i> Batch Results ({{ batch_results|length }} images)</span>
+    <a href="{{ url_for('batch_export_csv') }}" class="btn btn-sm btn-av-outline">
+      <i class="fa-solid fa-file-csv"></i> Export as CSV
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-striped mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Plate</th>
+            <th>Vehicle</th>
+            <th>Status</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in batch_results %}
+          <tr>
+            <td>{{ row.filename }}</td>
+            <td>{{ row.plate_number or '-' }}</td>
+            <td>
+              {% if row.make %}
+                {{ row.colour }} {{ row.make }} {{ row.model }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% if row.status == 'stolen' %}
+                <span class="badge badge-stolen">STOLEN</span>
+              {% elif row.status == 'mismatch' %}
+                <span class="badge badge-mismatch">MISMATCH</span>
+              {% elif row.status == 'clear' %}
+                <span class="badge badge-clear">CLEAR</span>
+              {% elif row.status == 'unregistered' %}
+                <span class="badge badge-unregistered">UNREGISTERED</span>
+              {% else %}
+                <span class="badge bg-secondary">ERROR</span>
+              {% endif %}
+            </td>
+            <td class="small">{{ row.message }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="av-card p-4 text-center text-muted">
+  <i class="fa-solid fa-images fa-3x mb-3"></i>
+  <p class="mb-0">Upload images above to process them as a batch.</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// PHASE 3: simple progress indicator for batch uploads. A true live
+// progress bar would need server-sent events / websockets to report
+// per-image completion; for a synchronous form POST, we show an
+// indeterminate "processing" state while the browser uploads and the
+// server works through the batch, which is enough to reassure the
+// officer nothing has frozen.
+document.getElementById('batch-form').addEventListener('submit', function () {
+  const btn = document.getElementById('batch-submit-btn');
+  const progress = document.getElementById('batch-progress');
+  const fileCount = document.getElementById('batch-images').files.length;
+
+  progress.classList.remove('d-none');
+  document.getElementById('batch-progress-bar').textContent = `Processing ${fileCount} image(s), please wait...`;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}AutoVerify NG - Vehicle Verification System{% endblock %}
+{% block content %}
+
+{% if not session.get('vehicle_id') and not session.get('officer_id') %}
+<!-- Public landing page hero (shown to logged-out visitors) -->
+<div class="hero-section text-center py-5 mb-4">
+  <div class="mb-3" style="font-size: 2.75rem;">🚗</div>
+  <h1 class="hero-title">AutoVerify <span style="color: var(--av-primary);">NG</span></h1>
+  <p class="hero-tagline">Real-time vehicle plate verification and citizen reporting for safer Nigerian roads</p>
+
+  <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
+    <a href="{{ url_for('register') }}" class="btn btn-av-primary btn-lg">
+      <i class="fa-solid fa-file-pen"></i> Register Vehicle
+    </a>
+    <a href="{{ url_for('login') }}" class="btn btn-av-outline btn-lg">
+      <i class="fa-solid fa-right-to-bracket"></i> Owner Login
+    </a>
+    <a href="{{ url_for('officer_login') }}" class="btn btn-av-outline btn-lg">
+      <i class="fa-solid fa-user-tie"></i> Officer Login
+    </a>
+  </div>
+
+  <div class="row g-3 mt-4 justify-content-center">
+    <div class="col-6 col-md-3">
+      <i class="fa-solid fa-camera fa-2x mb-2" style="color: var(--av-primary);"></i>
+      <p class="small text-muted mb-0">Real OCR plate reading</p>
+    </div>
+    <div class="col-6 col-md-3">
+      <i class="fa-solid fa-triangle-exclamation fa-2x mb-2" style="color: var(--av-amber-text);"></i>
+      <p class="small text-muted mb-0">Instant stolen-vehicle alerts</p>
+    </div>
+    <div class="col-6 col-md-3">
+      <i class="fa-solid fa-location-dot fa-2x mb-2" style="color: var(--av-primary);"></i>
+      <p class="small text-muted mb-0">GPS-tagged scan logs</p>
+    </div>
+    <div class="col-6 col-md-3">
+      <i class="fa-solid fa-users fa-2x mb-2" style="color: var(--av-primary);"></i>
+      <p class="small text-muted mb-0">Citizen ownership reporting</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <h3 class="section-title mb-0">
+    {% if session.get('officer_id') %}Control Room Dashboard{% else %}Live System Stats{% endif %}
+  </h3>
+  <div class="text-end">
+    <div id="live-clock" class="fw-bold fs-5"></div>
+    <div id="live-date" class="text-muted small"></div>
+  </div>
+</div>
+
+{% if session.get('officer_id') %}
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <a href="{{ url_for('verify') }}" class="btn btn-av-primary btn-lg">
+    <i class="fa-solid fa-camera"></i> Scan Vehicle
+  </a>
+  <a href="{{ url_for('batch') }}" class="btn btn-av-outline btn-lg">
+    <i class="fa-solid fa-layer-group"></i> Batch Scan
+  </a>
+  <a href="{{ url_for('hotlist') }}" class="btn btn-av-outline btn-lg">
+    <i class="fa-solid fa-triangle-exclamation"></i> View Hotlist
+  </a>
+  <a href="{{ url_for('reports') }}" class="btn btn-av-outline btn-lg">
+    <i class="fa-solid fa-clipboard-list"></i> Owner Reports
+  </a>
+  {% if session.get('is_admin') %}
+  <a href="{{ url_for('admin') }}" class="btn btn-av-outline btn-lg">
+    <i class="fa-solid fa-user-shield"></i> Admin Panel
+  </a>
+  <a href="{{ url_for('admin_analytics') }}" class="btn btn-av-outline btn-lg">
+    <i class="fa-solid fa-chart-line"></i> Analytics
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card d-flex align-items-center justify-content-between">
+      <div>
+        <div class="stat-label">Registered Vehicles</div>
+        <div class="stat-value">{{ total_vehicles }}</div>
+      </div>
+      <i class="fa-solid fa-car fa-2x"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card stat-ok d-flex align-items-center justify-content-between">
+      <div>
+        <div class="stat-label">Scans Today</div>
+        <div class="stat-value">{{ scans_today }}</div>
+      </div>
+      <i class="fa-solid fa-camera fa-2x"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card stat-danger d-flex align-items-center justify-content-between">
+      <div>
+        <div class="stat-label">Active Stolen Reports</div>
+        <div class="stat-value">{{ active_stolen }}</div>
+      </div>
+      <i class="fa-solid fa-triangle-exclamation fa-2x"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card stat-warn d-flex align-items-center justify-content-between">
+      <div>
+        <div class="stat-label">Mismatches Today</div>
+        <div class="stat-value">{{ mismatches_today }}</div>
+      </div>
+      <i class="fa-solid fa-circle-exclamation fa-2x"></i>
+    </div>
+  </div>
+</div>
+
+<div class="av-card">
+  <div class="card-header"><i class="fa-solid fa-clock-rotate-left"></i> Recent Scan Logs</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-striped mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Plate</th>
+            <th>Recognized Vehicle</th>
+            <th>Officer</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for scan in recent_scans %}
+          <tr>
+            <td>{{ scan.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td><strong>{{ scan.plate_number }}</strong></td>
+            <td>{{ scan.recognized_colour }} {{ scan.recognized_make }} {{ scan.recognized_model }}</td>
+            <td>{{ scan.officer.full_name }}</td>
+            <td>
+              {% if scan.stolen_flag %}
+                <span class="badge badge-stolen">STOLEN</span>
+              {% elif not scan.matched %}
+                <span class="badge badge-mismatch">MISMATCH</span>
+              {% else %}
+                <span class="badge badge-clear">VERIFIED</span>
+              {% endif %}
+              {% if scan.report_flag and not scan.stolen_flag %}
+                <span class="badge badge-unregistered">REPORT ACTIVE</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-4">No scans logged yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ---------- Live clock ----------
+function updateClock() {
+  const now = new Date();
+  document.getElementById('live-clock').textContent = now.toLocaleTimeString();
+  document.getElementById('live-date').textContent = now.toLocaleDateString(undefined, {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+}
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+{% endblock %}

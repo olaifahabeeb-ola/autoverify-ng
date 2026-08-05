@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Register Vehicle - AutoVerify NG{% endblock %}
+{% block content %}
+
+<h3 class="section-title"><i class="fa-solid fa-file-pen"></i> Vehicle Registration</h3>
+
+<div class="av-card p-4" style="max-width: 700px; margin: 0 auto;">
+  <form method="POST" enctype="multipart/form-data">
+    <h6 class="mb-3" style="color: var(--av-primary);"><i class="fa-solid fa-car"></i> Vehicle Details</h6>
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label">Plate Number *</label>
+        <input type="text" name="plate_number" class="form-control" placeholder="e.g. ABC-123-XY"
+               pattern="[A-Za-z]{3}[\s\-]?\d{3}[\s\-]?[A-Za-z]{2}"
+               title="3 letters, 3 numbers, 2 letters — e.g. ABC-123-XY" required>
+        <div class="form-text">
+          Nigerian format: <strong>AAA-123-AA</strong> —
+          Lagos e.g. <code>ABC-123-XY</code>, Abuja/FCT e.g. <code>ABJ-123-KJ</code>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Make *</label>
+        <input type="text" name="make" class="form-control" placeholder="Toyota" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Model *</label>
+        <input type="text" name="model" class="form-control" placeholder="Camry" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Year *</label>
+        <input type="number" name="year" class="form-control" placeholder="2020" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Colour *</label>
+        <input type="text" name="colour" class="form-control" placeholder="white" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Vehicle Photo</label>
+        <input type="file" name="photo" class="form-control" accept="image/*">
+        <div class="form-text">Optional — helps officers confirm identity at a glance.</div>
+      </div>
+    </div>
+
+    <hr style="border-color: var(--av-border); margin: 2rem 0;">
+
+    <h6 class="mb-3" style="color: var(--av-primary);"><i class="fa-solid fa-user"></i> Owner Details</h6>
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label">Full Name *</label>
+        <input type="text" name="owner_name" class="form-control" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Phone Number *</label>
+        <input type="tel" name="owner_phone" class="form-control" required>
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Email Address *</label>
+        <input type="email" name="owner_email" class="form-control" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Password *</label>
+        <input type="password" name="password" class="form-control" required>
+        <div class="form-text">At least 8 characters recommended.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Confirm Password *</label>
+        <input type="password" name="confirm_password" class="form-control" required>
+      </div>
+    </div>
+
+    <p class="text-muted small"><i class="fa-solid fa-circle-info"></i> One plate can only be registered to one owner. Duplicate plates are rejected.</p>
+
+    <button type="submit" class="btn btn-av-primary w-100 mt-2"><i class="fa-solid fa-check"></i> Register Vehicle</button>
+  </form>
+  <p class="text-center mt-3 mb-0">Already registered? <a href="{{ url_for('login') }}">Log in here</a></p>
+</div>
+
+{% endblock %}

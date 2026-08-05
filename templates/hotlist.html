@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Stolen Vehicle Hotlist - AutoVerify NG{% endblock %}
+{% block content %}
+
+<h3 class="section-title"><i class="fa-solid fa-triangle-exclamation"></i> Stolen Vehicle Hotlist</h3>
+
+{% if session.get('is_admin') %}
+<div class="av-card p-3 mb-3">
+  <form method="POST" action="{{ url_for('admin_hotlist_add') }}" class="d-flex flex-wrap gap-2 align-items-end">
+    <input type="hidden" name="next" value="hotlist">
+    <div>
+      <label class="form-label mb-1">Plate Number</label>
+      <input type="text" name="plate_number" class="form-control" style="min-width:180px;"
+             placeholder="e.g. ABC-123-XY" required>
+    </div>
+    <div class="flex-grow-1">
+      <label class="form-label mb-1">Description</label>
+      <input type="text" name="description" class="form-control" placeholder="e.g. Reported by police">
+    </div>
+    <button type="submit" class="btn btn-av-primary"><i class="fa-solid fa-plus"></i> Add to Hotlist</button>
+  </form>
+</div>
+{% endif %}
+
+<div class="av-card">
+  <div class="card-header"><i class="fa-solid fa-car-burst"></i> Active Stolen Reports</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-striped mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Plate</th>
+            <th>Vehicle</th>
+            <th>Owner</th>
+            <th>Date Reported</th>
+            <th>Description</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in stolen_reports %}
+          <tr>
+            <td><strong>{{ r.vehicle.plate_number }}</strong></td>
+            <td>{{ r.vehicle.colour }} {{ r.vehicle.make }} {{ r.vehicle.model }}</td>
+            <td>{{ r.vehicle.owner_name }}<br><small class="text-muted">{{ r.vehicle.owner_phone }}</small></td>
+            <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ r.description or '-' }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('hotlist_resolve', report_id=r.id) }}"
+                    onsubmit="return confirm('Mark this stolen report as resolved?');">
+                <button type="submit" class="btn btn-sm btn-av-outline">Mark Resolved</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-4">No active stolen reports. Hotlist clear.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

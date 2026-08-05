@@ -1,0 +1,24 @@
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Werkzeug==3.0.3
+gunicorn==22.0.0
+
+# ---- Phase 2: real AI + image processing ----
+opencv-python-headless>=4.13.0
+pytesseract>=0.3.13
+numpy>=1.26
+Pillow>=10.4.0
+
+# TensorFlow powers the MobileNetV2 vehicle make/model classifier.
+# tensorflow-cpu works on any laptop (no GPU required).
+tensorflow-cpu==2.21.0
+
+# Optional: only needed if you set MAIL_ENABLED=True in app.py for real
+# email alerts instead of the default console/alerts.log simulation.
+# Flask-Mail==0.10.0
+
+# ---- Phase 3: advanced field features + admin intelligence ----
+# No new Python packages required. Multi-vehicle detection reuses the
+# OpenCV/Tesseract pipeline from Phase 2, voice alerts use the browser's
+# built-in Web Speech API, CSV export uses Python's standard library, and
+# PDF export uses the browser's native print-to-PDF (window.print()).

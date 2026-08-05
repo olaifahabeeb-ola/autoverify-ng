@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel - AutoVerify NG{% endblock %}
+{% block content %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <h3 class="section-title mb-0"><i class="fa-solid fa-user-shield"></i> Admin Panel</h3>
+  <a href="{{ url_for('admin_analytics') }}" class="btn btn-av-outline">
+    <i class="fa-solid fa-chart-line"></i> View Analytics
+  </a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="av-card p-4 mb-3">
+      <h6 class="mb-3" style="color: var(--av-primary);"><i class="fa-solid fa-user-plus"></i> Create Officer Account</h6>
+      <form method="POST" action="{{ url_for('admin_create_officer') }}">
+        <div class="mb-2">
+          <label class="form-label">Full Name</label>
+          <input type="text" name="full_name" class="form-control" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Badge Number</label>
+          <input type="text" name="badge_number" class="form-control" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Username</label>
+          <input type="text" name="username" class="form-control" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" class="form-control" required>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="is_admin" id="isAdminCheck">
+          <label class="form-check-label" for="isAdminCheck">Grant admin access</label>
+        </div>
+        <button type="submit" class="btn btn-av-primary w-100">Create Officer</button>
+      </form>
+    </div>
+
+    <div class="av-card p-4">
+      <h6 class="mb-3" style="color: var(--av-primary);"><i class="fa-solid fa-plus"></i> Manually Add to Hotlist</h6>
+      <form method="POST" action="{{ url_for('admin_hotlist_add') }}">
+        <div class="mb-2">
+          <label class="form-label">Plate Number</label>
+          <input type="text" name="plate_number" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <input type="text" name="description" class="form-control" placeholder="e.g. Reported by police">
+        </div>
+        <button type="submit" class="btn btn-av-outline w-100">Add to Hotlist</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="av-card mb-3">
+      <div class="card-header">Officer Accounts</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Name</th><th>Username</th><th>Badge</th><th>Admin</th></tr></thead>
+            <tbody>
+              {% for o in officers %}
+              <tr>
+                <td>{{ o.full_name }}</td>
+                <td>{{ o.username }}</td>
+                <td>{{ o.badge_number }}</td>
+                <td>{% if o.is_admin %}<span class="badge bg-danger">Yes</span>{% else %}No{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="av-card mb-3">
+      <div class="card-header">All Registered Vehicles ({{ vehicles|length }})</div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Plate</th><th>Vehicle</th><th>Owner</th></tr></thead>
+            <tbody>
+              {% for v in vehicles %}
+              <tr>
+                <td>{{ v.plate_number }}</td>
+                <td>{{ v.colour }} {{ v.make }} {{ v.model }}</td>
+                <td>{{ v.owner_name }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="av-card mb-3">
+      <div class="card-header">All Owner Reports ({{ reports|length }})</div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Plate</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              {% for r in reports %}
+              <tr>
+                <td>{{ r.vehicle.plate_number }}</td>
+                <td>{{ r.report_type }}</td>
+                <td>{% if r.is_active %}<span class="badge bg-warning text-dark">Active</span>{% else %}<span class="badge bg-success">Resolved</span>{% endif %}</td>
+                <td>
+                  {% if r.is_active %}
+                  <form method="POST" action="{{ url_for('admin_hotlist_remove', report_id=r.id) }}">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Resolve</button>
+                  </form>
+                  {% else %}-{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="av-card">
+      <div class="card-header">Recent Scan Logs</div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Time</th><th>Plate</th><th>Officer</th><th>Matched</th></tr></thead>
+            <tbody>
+              {% for s in scan_logs %}
+              <tr>
+                <td>{{ s.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ s.plate_number }}</td>
+                <td>{{ s.officer.full_name }}</td>
+                <td>{% if s.matched %}<span class="badge bg-success">Yes</span>{% else %}<span class="badge bg-danger">No</span>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="av-card mt-3">
+      <div class="card-header"><i class="fa-solid fa-paper-plane"></i> Owner Notifications (Simulated SMS/Email)</div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Time</th><th>Vehicle</th><th>Message</th><th>Channel</th></tr></thead>
+            <tbody>
+              {% for n in owner_notifications %}
+              <tr>
+                <td>{{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ n.vehicle.plate_number }}</td>
+                <td class="small">{{ n.message }}</td>
+                <td><span class="badge bg-secondary">{{ n.channel }}</span></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="text-center text-muted py-3">No owner notifications sent yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="av-card mt-3">
+      <div class="card-header"><i class="fa-solid fa-layer-group"></i> Batch Upload History</div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Time</th><th>Officer</th><th>Images</th><th>Stolen</th><th>Mismatch</th></tr></thead>
+            <tbody>
+              {% for b in batch_uploads %}
+              <tr>
+                <td>{{ b.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ b.officer.full_name }}</td>
+                <td>{{ b.image_count }}</td>
+                <td>{{ b.stolen_count }}</td>
+                <td>{{ b.mismatch_count }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-center text-muted py-3">No batch uploads processed yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+autoverify.db
+alerts.log
+owner_notifications.log
+static/uploads/*.png
+static/uploads/*.jpg
+static/uploads/*.jpeg
+.git/
+.gitignore
+*.md

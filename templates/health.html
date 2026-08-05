@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}System Health - AutoVerify NG{% endblock %}
+{% block content %}
+
+<h3 class="section-title"><i class="fa-solid fa-heart-pulse"></i> System Health</h3>
+
+<div class="row g-3">
+  <div class="col-md-6 col-lg-3">
+    <div class="stat-card {{ 'stat-ok' if health.ocr_available else 'stat-danger' }}">
+      <div class="stat-label">Plate OCR (Tesseract)</div>
+      <div class="stat-value fs-4">
+        {% if health.ocr_available %}
+          <i class="fa-solid fa-circle-check text-success"></i> Loaded
+        {% else %}
+          <i class="fa-solid fa-circle-xmark text-danger"></i> Fallback
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-3">
+    <div class="stat-card {{ 'stat-ok' if health.classifier_loaded else 'stat-warn' }}">
+      <div class="stat-label">Vehicle Classifier (MobileNetV2)</div>
+      <div class="stat-value fs-4">
+        {% if health.classifier_loaded %}
+          <i class="fa-solid fa-circle-check text-success"></i> Trained
+        {% else %}
+          <i class="fa-solid fa-triangle-exclamation text-warning"></i> Not Trained
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label">Database Size</div>
+      <div class="stat-value">{{ health.db_size_kb }} KB</div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label">Registered Vehicles</div>
+      <div class="stat-value">{{ health.vehicle_count }}</div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label">Officers</div>
+      <div class="stat-value">{{ health.officer_count }}</div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label">Total Scans</div>
+      <div class="stat-value">{{ health.scan_count }}</div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-3">
+    <div class="stat-card stat-danger">
+      <div class="stat-label">Active Stolen Reports</div>
+      <div class="stat-value">{{ health.active_stolen_count }}</div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label">Last Scan</div>
+      <div class="stat-value fs-5">
+        {% if health.last_scan_at %}
+          {{ health.last_scan_at.strftime('%Y-%m-%d %H:%M') }}
+        {% else %}
+          Never
+        {% endif %}
+      </div>
+      {% if health.last_scan_plate %}
+      <div class="text-muted small">{{ health.last_scan_plate }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="av-card p-4 mt-3">
+  <h6 class="mb-2" style="color: var(--av-primary);"><i class="fa-solid fa-circle-info"></i> Notes</h6>
+  <ul class="mb-0">
+    <li>"Fallback" for OCR means the Tesseract system binary wasn't found — plate reading uses demo placeholder values. See the README for install instructions.</li>
+    <li>"Not Trained" for the vehicle classifier means <code>models_ml/vehicle_classifier.h5</code> doesn't exist yet — colour detection still works for real; run <code>utils/train_classifier.py</code> on your own labelled photos to enable real make/model recognition.</li>
+  </ul>
+</div>
+
+{% endblock %}
