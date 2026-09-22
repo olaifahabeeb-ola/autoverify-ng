@@ -22,3 +22,4 @@ tensorflow-cpu==2.21.0
 # OpenCV/Tesseract pipeline from Phase 2, voice alerts use the browser's
 # built-in Web Speech API, CSV export uses Python's standard library, and
 # PDF export uses the browser's native print-to-PDF (window.print()).
+psycopg2-binary>=2.9,<3.0
