@@ -63,13 +63,40 @@
       <div class="vehicle-result-list" id="vehicle-result-list">
         {% for v in vehicles %}
         <div class="verify-result status-{{ v.status }} mb-3" data-status="{{ v.status }}" data-message="{{ v.message }}">
+
+          {% if v.registered_vehicle and v.registered_vehicle.image_path %}
+          <div class="d-flex align-items-center gap-3 mb-3 pb-3" style="border-bottom: 1px solid var(--av-border);">
+            <img src="{{ url_for('static', filename=v.registered_vehicle.image_path) }}"
+                 alt="Registered photo of {{ v.plate_number }}"
+                 class="rounded flex-shrink-0"
+                 style="width: 110px; height: 110px; object-fit: cover; border: 1px solid var(--av-border);">
+            <div>
+              <div class="text-muted small text-uppercase fw-semibold">Registered Vehicle Photo</div>
+              <div class="fw-bold">
+                {{ v.registered_vehicle.colour }} {{ v.registered_vehicle.year }}
+                {{ v.registered_vehicle.make }} {{ v.registered_vehicle.model }}
+              </div>
+              {% if not v.visually_verified %}
+              <div class="small text-muted"><i class="fa-solid fa-eye"></i> Compare this photo with the vehicle in front of you.</div>
+              {% endif %}
+            </div>
+          </div>
+          {% elif v.registered_vehicle %}
+          <div class="d-flex align-items-center gap-2 mb-3 pb-3 text-muted small" style="border-bottom: 1px solid var(--av-border);">
+            <i class="fa-solid fa-image fa-lg"></i>
+            <span>No photo on file for this vehicle (registered as {{ v.registered_vehicle.colour }} {{ v.registered_vehicle.year }} {{ v.registered_vehicle.make }} {{ v.registered_vehicle.model }}).</span>
+          </div>
+          {% endif %}
+
           <h5>
             {% if v.status == 'stolen' %}
               <span class="badge badge-stolen mb-2">Stolen Vehicle</span>
             {% elif v.status == 'mismatch' %}
               <span class="badge badge-mismatch mb-2">Mismatch Detected</span>
-            {% elif v.status == 'clear' %}
+            {% elif v.status == 'clear' and v.visually_verified %}
               <span class="badge badge-clear mb-2">Verified</span>
+            {% elif v.status == 'clear' %}
+              <span class="badge badge-unregistered mb-2">Plate Checked (No Photo)</span>
             {% else %}
               <span class="badge badge-unregistered mb-2">Unregistered</span>
             {% endif %}
@@ -90,6 +117,7 @@
           <hr style="border-color: var(--av-border);">
           <table class="table table-sm mb-0">
             <tr><th>Plate Read</th><td>{{ v.plate_number }}</td></tr>
+            {% if v.visually_verified %}
             <tr><th>Recognized Vehicle</th><td>{{ v.recognized_colour }} {{ v.recognized_make }} {{ v.recognized_model }}</td></tr>
             {% if v.recognition_method %}
             <tr><th>Recognition Source</th>
@@ -100,6 +128,11 @@
                   <span class="badge badge-unregistered">Placeholder (no trained model yet)</span>
                 {% endif %}
               </td>
+            </tr>
+            {% endif %}
+            {% else %}
+            <tr><th>Recognized Vehicle</th>
+              <td class="text-muted"><i class="fa-solid fa-camera-slash"></i> Not captured — no photo taken (manual entry)</td>
             </tr>
             {% endif %}
             {% if gps_lat and gps_lon %}

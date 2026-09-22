@@ -135,7 +135,13 @@
           <tr>
             <td>{{ scan.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
             <td><strong>{{ scan.plate_number }}</strong></td>
-            <td>{{ scan.recognized_colour }} {{ scan.recognized_make }} {{ scan.recognized_model }}</td>
+            <td>
+              {% if scan.visually_verified %}
+                {{ scan.recognized_colour }} {{ scan.recognized_make }} {{ scan.recognized_model }}
+              {% else %}
+                <span class="text-muted small"><i class="fa-solid fa-camera-slash"></i> Not captured (manual entry)</span>
+              {% endif %}
+            </td>
             <td>{{ scan.officer.full_name }}</td>
             <td>
               {% if scan.stolen_flag %}

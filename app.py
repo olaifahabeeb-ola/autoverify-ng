@@ -266,8 +266,17 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
     creates the ScanLog row, dispatches a priority alert (STOLEN/MISMATCH),
     and simulates an owner notification for STOLEN detections. Returns a
     result dict ready for template rendering / CSV export.
+
+    IMPORTANT: `recognized["method"]` may be "no_image" — this means no
+    actual photo was captured (e.g. manual plate entry with the camera
+    never started), so `recognized["make"/"model"/"colour"]` are None
+    rather than a real (or even a random placeholder) observation. In that
+    case we skip attribute comparison entirely rather than comparing
+    against a fabricated guess, which would otherwise risk a false
+    MISMATCH alert on a plate that was never actually looked at.
     """
     vehicle = Vehicle.query.filter_by(plate_number=plate_number).first()
+    visually_verified = recognized.get("method") != "no_image"
 
     result = {
         "plate_number": plate_number,
@@ -275,15 +284,17 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
         "recognized_model": recognized["model"],
         "recognized_colour": recognized["colour"],
         "recognition_method": recognized.get("method"),
+        "visually_verified": visually_verified,
         "status": None,        # "stolen" | "mismatch" | "clear" | "unregistered"
         "message": "",
         "notes": [],
         "owner_info": None,
+        "registered_vehicle": None,
         "trigger_alert": False,
         "alert_type": None,
     }
 
-    matched = False
+    matched = True
     mismatch_detail = None
     report_flag = False
     stolen_flag = False
@@ -304,33 +315,47 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
             result["trigger_alert"] = True
             result["alert_type"] = "stolen"
 
-        mismatches = []
-        if recognized["make"].lower() != vehicle.make.lower():
-            mismatches.append(f"make (registered: {vehicle.make}, seen: {recognized['make']})")
-        if recognized["model"].lower() != vehicle.model.lower():
-            mismatches.append(f"model (registered: {vehicle.model}, seen: {recognized['model']})")
-        if recognized["colour"].lower() != vehicle.colour.lower():
-            mismatches.append(f"colour (registered: {vehicle.colour}, seen: {recognized['colour']})")
-
-        if mismatches:
-            matched = False
-            mismatch_detail = (
-                f"Plate belongs to a {vehicle.year} {vehicle.make} {vehicle.model} ({vehicle.colour}), "
-                f"but this appears to be a {recognized['make']} {recognized['model']} ({recognized['colour']}). "
-                f"Mismatch in: {', '.join(mismatches)}."
+        if not visually_verified:
+            # No photo was captured — only the plate/database was checked.
+            # Never fabricate a make/model/colour comparison here.
+            result["notes"].append(
+                "ℹ️ No photo captured — vehicle appearance was not visually verified, "
+                "only the plate number was checked against the database."
             )
             if result["status"] is None:
-                result["status"] = "mismatch"
-                result["message"] = f"⚠️ MISMATCH: {mismatch_detail}"
-                result["trigger_alert"] = True
-                result["alert_type"] = "mismatch"
-            else:
-                result["notes"].append(mismatch_detail)
-        else:
-            matched = True
-            if result["status"] is None:
                 result["status"] = "clear"
-                result["message"] = "✅ CLEAR: Vehicle verified — no issues detected."
+                result["message"] = (
+                    "✅ PLATE CHECKED: No active stolen report found for this plate "
+                    "(appearance not verified — no photo taken)."
+                )
+        else:
+            mismatches = []
+            if recognized["make"].lower() != vehicle.make.lower():
+                mismatches.append(f"make (registered: {vehicle.make}, seen: {recognized['make']})")
+            if recognized["model"].lower() != vehicle.model.lower():
+                mismatches.append(f"model (registered: {vehicle.model}, seen: {recognized['model']})")
+            if recognized["colour"].lower() != vehicle.colour.lower():
+                mismatches.append(f"colour (registered: {vehicle.colour}, seen: {recognized['colour']})")
+
+            if mismatches:
+                matched = False
+                mismatch_detail = (
+                    f"Plate belongs to a {vehicle.year} {vehicle.make} {vehicle.model} ({vehicle.colour}), "
+                    f"but this appears to be a {recognized['make']} {recognized['model']} ({recognized['colour']}). "
+                    f"Mismatch in: {', '.join(mismatches)}."
+                )
+                if result["status"] is None:
+                    result["status"] = "mismatch"
+                    result["message"] = f"⚠️ MISMATCH: {mismatch_detail}"
+                    result["trigger_alert"] = True
+                    result["alert_type"] = "mismatch"
+                else:
+                    result["notes"].append(mismatch_detail)
+            else:
+                matched = True
+                if result["status"] is None:
+                    result["status"] = "clear"
+                    result["message"] = "✅ CLEAR: Vehicle verified — no issues detected."
 
         if ownership_report:
             report_flag = True
@@ -339,6 +364,18 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
         if written_off_report:
             report_flag = True
             result["notes"].append("ℹ️ REPORT ACTIVE: Vehicle has been marked as written off / scrapped by owner.")
+
+        # Registered vehicle photo + details — shown to officers so they can
+        # visually compare against the real vehicle in front of them. This
+        # matters most for manual/no-photo checks, where no AI comparison
+        # runs at all (see build_and_persist_scan_result's no_image branch).
+        result["registered_vehicle"] = {
+            "make": vehicle.make,
+            "model": vehicle.model,
+            "year": vehicle.year,
+            "colour": vehicle.colour,
+            "image_path": vehicle.image_path,
+        }
 
         # Ownership details shown only to authorized officers after successful verification
         result["owner_info"] = {
@@ -355,6 +392,7 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
         recognized_model=recognized["model"],
         recognized_colour=recognized["colour"],
         matched=matched,
+        visually_verified=visually_verified,
         mismatch_detail=mismatch_detail,
         report_flag=report_flag,
         stolen_flag=stolen_flag,
@@ -450,6 +488,8 @@ def api_dashboard_stats():
     all_scans = ScanLog.query.all()
     model_counts = {}
     for s in all_scans:
+        if not s.visually_verified or not s.recognized_make:
+            continue
         label = f"{s.recognized_make} {s.recognized_model}".strip()
         if label:
             model_counts[label] = model_counts.get(label, 0) + 1
@@ -666,14 +706,24 @@ def verify_post():
     gps_lon = request.form.get("gps_lon") or request.form.get("manual_gps_lon")
     manual_plate = request.form.get("manual_plate", "").strip().upper()
 
+    # A real captured frame is always a "data:image/..." data URL. Anything
+    # else (empty string, missing field) means no photo was actually taken.
+    has_real_image = bool(image_data_url) and image_data_url.startswith("data:image")
+
     save_captured_image(image_data_url)  # stored for audit purposes
 
     vehicles_results = []
 
     if manual_plate:
-        # Officer typed the plate manually (OCR was unclear) — skip OCR/
-        # multi-vehicle detection entirely and treat this as one vehicle.
-        recognized = recognize_vehicle(image_data_url)
+        # Officer typed the plate manually (OCR was unclear, or no camera
+        # was used at all). Only run vehicle-attribute recognition if a
+        # photo was actually captured — otherwise there is nothing to
+        # recognize, and guessing would risk a false MISMATCH alert on a
+        # plate nobody actually looked at (see build_and_persist_scan_result).
+        if has_real_image:
+            recognized = recognize_vehicle(image_data_url)
+        else:
+            recognized = {"make": None, "model": None, "colour": None, "method": "no_image"}
         vehicles_results.append(
             build_and_persist_scan_result(manual_plate, recognized, session["officer_id"], gps_lat, gps_lon)
         )

@@ -29,6 +29,7 @@
       <table class="table table-hover table-striped mb-0 align-middle">
         <thead>
           <tr>
+            <th>Photo</th>
             <th>Plate</th>
             <th>Vehicle</th>
             <th>Owner</th>
@@ -40,6 +41,17 @@
         <tbody>
           {% for r in stolen_reports %}
           <tr>
+            <td>
+              {% if r.vehicle.image_path %}
+                <img src="{{ url_for('static', filename=r.vehicle.image_path) }}" alt="{{ r.vehicle.plate_number }}"
+                     class="rounded" style="width:56px;height:56px;object-fit:cover;border:1px solid var(--av-border);">
+              {% else %}
+                <div class="d-flex align-items-center justify-content-center text-muted rounded"
+                     style="width:56px;height:56px;background:var(--av-bg);border:1px solid var(--av-border);">
+                  <i class="fa-solid fa-image"></i>
+                </div>
+              {% endif %}
+            </td>
             <td><strong>{{ r.vehicle.plate_number }}</strong></td>
             <td>{{ r.vehicle.colour }} {{ r.vehicle.make }} {{ r.vehicle.model }}</td>
             <td>{{ r.vehicle.owner_name }}<br><small class="text-muted">{{ r.vehicle.owner_phone }}</small></td>
@@ -53,7 +65,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="6" class="text-center text-muted py-4">No active stolen reports. Hotlist clear.</td></tr>
+          <tr><td colspan="7" class="text-center text-muted py-4">No active stolen reports. Hotlist clear.</td></tr>
           {% endfor %}
         </tbody>
       </table>

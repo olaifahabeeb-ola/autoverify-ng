@@ -80,6 +80,7 @@ class ScanLog(db.Model):
     recognized_model = db.Column(db.String(50), nullable=True)
     recognized_colour = db.Column(db.String(30), nullable=True)
     matched = db.Column(db.Boolean, default=False)
+    visually_verified = db.Column(db.Boolean, default=True)  # False = plate-only check (manual entry, no photo captured)
     mismatch_detail = db.Column(db.Text, nullable=True)
     report_flag = db.Column(db.Boolean, default=False)
     stolen_flag = db.Column(db.Boolean, default=False)
