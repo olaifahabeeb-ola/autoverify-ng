@@ -3,6 +3,13 @@
 **A Vehicle Plate-to-Identity Verification System with Citizen Reporting**
 HND Final Year Project — **Phase 4** (final polish for defense)
 
+[![Tests](https://github.com/<your-username>/<repo-name>/actions/workflows/tests.yml/badge.svg)](https://github.com/<your-username>/<repo-name>/actions/workflows/tests.yml)
+
+*(Replace `<your-username>/<repo-name>` above with your actual GitHub path
+once pushed — see DEPLOY.md — and the badge will show live pass/fail
+status. GitHub Actions runs the full test suite automatically on every
+push.)*
+
 ---
 
 ## 0. UI Redesign (Post-Phase 4)
@@ -389,7 +396,61 @@ connection returns.
 
 ---
 
-## 18. Project Structure
+## 18. Automated Testing
+
+A `pytest` suite (`tests/`) covers the core business logic with 63 tests
+across 5 files, run against an isolated temporary SQLite database (never
+your real `autoverify.db`) that's reset and reseeded before every test:
+
+- **`test_plate_validation.py`** — Nigerian plate format normalisation/
+  rejection, duplicate plate and email rejection, password confirmation.
+- **`test_auth.py`** — owner/officer login success and failure, and
+  role-based access control (a non-admin officer cannot reach `/admin`,
+  `/admin/analytics`, or `/admin/alerts`; an owner session can't reach
+  officer-only routes).
+- **`test_verify.py`** — the core scan/verify logic, including a full
+  **regression suite for a real bug we shipped and fixed**: manual plate
+  entry with no photo captured used to call the recognition pipeline
+  anyway, which returned a *random* placeholder colour/make/model that
+  then got compared against the real registered vehicle — producing a
+  false "MISMATCH" alert roughly 89% of the time on a plate nobody had
+  actually looked at. `test_no_false_mismatch_across_many_runs` repeats
+  that exact scenario 30 times and asserts it never happens again; several
+  other tests confirm the STOLEN check still correctly fires with no
+  photo (it's a real database lookup, not a visual guess), and that real
+  camera/photo-based comparison is untouched.
+- **`test_reports_and_hotlist.py`** — owner report filing, hotlist
+  add/resolve, `resolved_at` timestamp tracking.
+- **`test_api.py`** — the `/api/hotlist` and `/api/analytics-stats` JSON
+  endpoints and the `/health` diagnostics page.
+
+### Running the tests
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+pytest tests/ -v
+```
+
+With a coverage report (matches what CI runs):
+```bash
+pytest tests/ -v --cov=. --cov-report=term-missing --cov-config=.coveragerc
+```
+
+Current coverage is roughly 74% of `app.py`/`models.py`/`utils/` combined
+(mostly untested: the `utils/train_classifier.py` standalone training
+script, and a few defensive error-handling branches for things like a
+corrupted upload).
+
+### Continuous Integration
+
+`.github/workflows/tests.yml` runs the full suite automatically on every
+push and pull request (installing Tesseract OCR first, since real OCR
+tests depend on it), so a broken change is caught before it reaches a
+demo or Render deploy — not discovered live in front of a panel.
+
+---
+
+## 19. Project Structure
 
 ```
 autoverify/
@@ -397,14 +458,25 @@ autoverify/
 ├── models.py                  # Vehicle, OwnerReport, Officer, ScanLog, AlertLog,
 │                               # OwnerNotification, BatchUpload
 ├── requirements.txt
+├── requirements-dev.txt        # pytest + pytest-cov, for testing only
+├── pytest.ini                  # pytest configuration
+├── .coveragerc                  # coverage.py configuration
 ├── run_all.sh / run_all.bat   # one-command local setup + launch
 ├── Dockerfile                  # for Render (or any Docker host) deployment
 ├── .dockerignore
 ├── .gitignore
+├── .github/workflows/tests.yml  # CI — runs the full test suite on every push
 ├── DEPLOY.md                    # step-by-step Render deployment guide
 ├── autoverify.db               # created automatically on first run
 ├── alerts.log                  # created automatically — priority alert audit trail
 ├── owner_notifications.log     # created automatically — owner notification audit trail
+├── tests/                       # pytest suite — see section 18
+│   ├── conftest.py               # isolated test DB + role-based client fixtures
+│   ├── test_plate_validation.py
+│   ├── test_auth.py
+│   ├── test_verify.py            # includes the false-mismatch regression suite
+│   ├── test_reports_and_hotlist.py
+│   └── test_api.py
 ├── models_ml/                  # trained classifier lives here once you train it
 │   ├── vehicle_classifier.h5   # (created by utils/train_classifier.py)
 │   └── class_labels.json
@@ -437,7 +509,7 @@ autoverify/
 
 ---
 
-## 19. Core Business Rules Implemented
+## 20. Core Business Rules Implemented
 
 - One plate → one owner. Duplicate plate registration is rejected at `/register`.
 - Plate numbers must match the Nigerian `AAA-123-AA` format (3 letters, 3
@@ -452,7 +524,7 @@ autoverify/
 
 ---
 
-## 20. Known Limitations
+## 21. Known Limitations
 
 - Make/model recognition requires you to supply and train on your own
   labelled photos (section 5.3) to move beyond placeholder values — this

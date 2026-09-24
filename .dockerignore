@@ -10,3 +10,13 @@ static/uploads/*.jpeg
 .git/
 .gitignore
 *.md
+
+# Test suite / CI — not needed in the production image
+tests/
+requirements-dev.txt
+pytest.ini
+.coveragerc
+.pytest_cache/
+.coverage
+htmlcov/
+.github/

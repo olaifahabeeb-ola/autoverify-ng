@@ -39,6 +39,11 @@ path from VS Code:
 > **not** committed (see `.gitignore`/`.dockerignore`) — they're
 > regenerated automatically on first run.
 
+> Once pushed, `.github/workflows/tests.yml` runs the full `pytest`
+> suite automatically on every push via GitHub Actions — check the
+> "Actions" tab on your repo to confirm it's green before (or after)
+> deploying. See README.md section 18 for details.
+
 ## 2. Create the Web Service on Render
 
 1. Go to https://render.com and sign in (GitHub sign-in is easiest — it

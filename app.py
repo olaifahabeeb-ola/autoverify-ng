@@ -9,11 +9,11 @@ from functools import wraps
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    session, flash, jsonify, Response
+    session, flash, jsonify, Response, abort
 )
 from werkzeug.utils import secure_filename
 
-from models import db, Vehicle, OwnerReport, Officer, ScanLog, AlertLog, OwnerNotification, BatchUpload
+from models import db, Vehicle, OwnerReport, Officer, ScanLog, AlertLog, OwnerNotification, BatchUpload, utcnow
 from utils.ocr import read_plate, locate_and_read_plates, is_ocr_available
 from utils.recognition import recognize_vehicle, is_classifier_loaded
 
@@ -27,13 +27,12 @@ MAX_BATCH_IMAGES = 10
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "autoverify-ng-dev-secret-change-in-production")
-
-_db_url = os.environ.get("DATABASE_URL", "")
-if _db_url.startswith("postgres://"):
-    _db_url = _db_url.replace("postgres://", "postgresql://", 1)
-app.config["SQLALCHEMY_DATABASE_URI"] = _db_url or ("sqlite:///" + os.path.join(BASE_DIR, "autoverify.db"))
-
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+    "DATABASE_URL", "sqlite:///" + os.path.join(BASE_DIR, "autoverify.db")
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB
 
 # ---- Phase 2: simulated alert dispatch settings ----
 # By default alerts are logged to the console + alerts.log (fine for a demo).
@@ -70,7 +69,7 @@ def send_alert(alert_type, plate_number, message, scan_log_id=None):
     If MAIL_ENABLED and Flask-Mail + real SMTP credentials are configured,
     also attempts to send a real email to ALERT_RECIPIENT.
     """
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp = utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     full_message = f"[{timestamp}] {alert_type.upper()} ALERT — Plate {plate_number}: {message}"
 
     print(f"\n🚨 {full_message}\n")
@@ -118,7 +117,7 @@ def notify_owner(vehicle, message, scan_log_id=None):
     purposes as a "simulated" notification. Stores an OwnerNotification row
     for audit (visible in the Admin panel).
     """
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp = utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     full_message = (
         f"[{timestamp}] OWNER NOTIFICATION — To: {vehicle.owner_name} "
         f"({vehicle.owner_email}, {vehicle.owner_phone}): {message}"
@@ -150,6 +149,17 @@ def notify_owner(vehicle, message, scan_log_id=None):
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def get_or_404(model, ident):
+    """Modern replacement for Flask-SQLAlchemy's Query.get_or_404(), which
+    internally still calls the legacy (SQLAlchemy 1.x-style) Query.get()
+    under the hood and triggers a LegacyAPIWarning. This uses the current
+    Session.get() API directly instead."""
+    obj = db.session.get(model, ident)
+    if obj is None:
+        abort(404)
+    return obj
 
 
 # PHASE 4: Nigerian plate format validation
@@ -234,7 +244,7 @@ def save_uploaded_image(file_storage):
     if not allowed_file(file_storage.filename):
         return None
     filename = secure_filename(file_storage.filename)
-    stamped = f"{int(datetime.utcnow().timestamp())}_{filename}"
+    stamped = f"{int(utcnow().timestamp())}_{filename}"
     full_path = os.path.join(app.config["UPLOAD_FOLDER"], stamped)
     file_storage.save(full_path)
     return f"uploads/{stamped}"
@@ -249,7 +259,7 @@ def save_captured_image(data_url, prefix="scan"):
         binary_data = base64.b64decode(encoded)
     except Exception:
         return None
-    stamped = f"{prefix}_{int(datetime.utcnow().timestamp())}.png"
+    stamped = f"{prefix}_{int(utcnow().timestamp())}.png"
     full_path = os.path.join(app.config["UPLOAD_FOLDER"], stamped)
     with open(full_path, "wb") as f:
         f.write(binary_data)
@@ -407,7 +417,7 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
     result["scan_id"] = scan.id
 
     if result["trigger_alert"]:
-        officer = Officer.query.get(officer_id)
+        officer = db.session.get(Officer, officer_id)
         location_note = ""
         if gps_lat and gps_lon:
             location_note = f" Location: https://maps.google.com/?q={gps_lat},{gps_lon}"
@@ -518,7 +528,7 @@ def api_hotlist():
     """
     stolen_reports = OwnerReport.query.filter_by(report_type="stolen", is_active=True).all()
     plates = [r.vehicle.plate_number for r in stolen_reports]
-    return jsonify({"plates": plates, "synced_at": datetime.utcnow().isoformat()})
+    return jsonify({"plates": plates, "synced_at": utcnow().isoformat()})
 
 
 # ------------------------------------------------------------------
@@ -624,7 +634,7 @@ def logout():
 @app.route("/owner/dashboard")
 @owner_login_required
 def owner_dashboard():
-    vehicle = Vehicle.query.get_or_404(session["vehicle_id"])
+    vehicle = get_or_404(Vehicle, session["vehicle_id"])
     reports = OwnerReport.query.filter_by(vehicle_id=vehicle.id).order_by(
         OwnerReport.created_at.desc()
     ).all()
@@ -638,7 +648,7 @@ def owner_dashboard():
 @app.route("/owner/report", methods=["POST"])
 @owner_login_required
 def owner_report():
-    vehicle = Vehicle.query.get_or_404(session["vehicle_id"])
+    vehicle = get_or_404(Vehicle, session["vehicle_id"])
 
     report_type = request.form.get("report_type", "")
     description = request.form.get("description", "").strip()
@@ -783,9 +793,9 @@ def hotlist():
 @app.route("/hotlist/resolve/<int:report_id>", methods=["POST"])
 @officer_login_required
 def hotlist_resolve(report_id):
-    report = OwnerReport.query.get_or_404(report_id)
+    report = get_or_404(OwnerReport, report_id)
     report.is_active = False
-    report.resolved_at = datetime.utcnow()  # PHASE 3: powers the "recovered vehicles" analytics chart
+    report.resolved_at = utcnow()  # PHASE 3: powers the "recovered vehicles" analytics chart
     db.session.commit()
     flash("Report marked as resolved.", "success")
     return redirect(url_for("hotlist"))
@@ -884,9 +894,9 @@ def admin_hotlist_add():
 @app.route("/admin/hotlist/remove/<int:report_id>", methods=["POST"])
 @admin_login_required
 def admin_hotlist_remove(report_id):
-    report = OwnerReport.query.get_or_404(report_id)
+    report = get_or_404(OwnerReport, report_id)
     report.is_active = False
-    report.resolved_at = datetime.utcnow()
+    report.resolved_at = utcnow()
     db.session.commit()
     flash("Hotlist entry removed.", "success")
     return redirect(url_for("admin"))

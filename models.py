@@ -1,8 +1,17 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
+
+
+def utcnow():
+    """Current UTC time as a naive datetime (matches the historical
+    datetime.utcnow() behavior, without using the now-deprecated call).
+    Kept naive deliberately so it's directly comparable with every
+    existing timestamp already stored this way, and with date.today()
+    in app.py's analytics date-range filtering."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Vehicle(db.Model):
@@ -21,7 +30,7 @@ class Vehicle(db.Model):
     colour = db.Column(db.String(30), nullable=False)
     image_path = db.Column(db.String(255), nullable=True)
 
-    registered_at = db.Column(db.DateTime, default=datetime.utcnow)
+    registered_at = db.Column(db.DateTime, default=utcnow)
 
     reports = db.relationship("OwnerReport", backref="vehicle", lazy=True,
                                cascade="all, delete-orphan")
@@ -48,7 +57,7 @@ class OwnerReport(db.Model):
     report_type = db.Column(db.String(30), nullable=False)  # stolen / ownership_change / written_off
     description = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
     resolved_at = db.Column(db.DateTime, nullable=True)  # PHASE 3: for "recovered vehicles" analytics
 
 
@@ -61,7 +70,7 @@ class Officer(db.Model):
     full_name = db.Column(db.String(120), nullable=False)
     badge_number = db.Column(db.String(30), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     def set_password(self, raw_password):
         self.password_hash = generate_password_hash(raw_password)
@@ -86,7 +95,7 @@ class ScanLog(db.Model):
     stolen_flag = db.Column(db.Boolean, default=False)
     gps_lat = db.Column(db.Float, nullable=True)
     gps_lon = db.Column(db.Float, nullable=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=utcnow)
 
     officer = db.relationship("Officer", backref="scans", lazy=True)
 
@@ -108,7 +117,7 @@ class AlertLog(db.Model):
     message = db.Column(db.Text, nullable=False)
     channel = db.Column(db.String(20), default="console")  # "console" | "email" | "sms"
     delivered = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     scan_log = db.relationship("ScanLog", backref="alerts", lazy=True)
 
@@ -128,7 +137,7 @@ class OwnerNotification(db.Model):
     message = db.Column(db.Text, nullable=False)
     channel = db.Column(db.String(20), default="console")  # "console" | "email" | "sms"
     delivered = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     vehicle = db.relationship("Vehicle", backref="notifications", lazy=True)
     scan_log = db.relationship("ScanLog", backref="owner_notifications", lazy=True)
@@ -147,6 +156,6 @@ class BatchUpload(db.Model):
     image_count = db.Column(db.Integer, default=0)
     stolen_count = db.Column(db.Integer, default=0)
     mismatch_count = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     officer = db.relationship("Officer", backref="batch_uploads", lazy=True)
