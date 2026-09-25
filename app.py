@@ -27,12 +27,33 @@ MAX_BATCH_IMAGES = 10
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "autoverify-ng-dev-secret-change-in-production")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-    "DATABASE_URL", "sqlite:///" + os.path.join(BASE_DIR, "autoverify.db")
+
+# Render (and Heroku-style hosts) commonly hand out Postgres URLs using the
+# old "postgres://" scheme, but modern SQLAlchemy only recognises
+# "postgresql://" — it dropped the bare "postgres" dialect alias. Rewrite
+# it here so a real DATABASE_URL from Render's Postgres add-on (used for
+# permanent, persistent storage instead of the ephemeral local SQLite
+# file) connects correctly instead of failing with a dialect-not-found error.
+_database_url = os.environ.get("DATABASE_URL")
+if _database_url and _database_url.startswith("postgres://"):
+    _database_url = _database_url.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = _database_url or (
+    "sqlite:///" + os.path.join(BASE_DIR, "autoverify.db")
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB
+
+# Log which database backend is actually active at startup (credentials
+# redacted) — makes it immediately visible in Render's deploy logs
+# whether the app is using the intended persistent Postgres database or
+# has silently fallen back to the ephemeral local SQLite file (e.g. if
+# DATABASE_URL was ever unset or misconfigured).
+_db_uri = app.config["SQLALCHEMY_DATABASE_URI"]
+_db_backend = _db_uri.split("://", 1)[0] if "://" in _db_uri else _db_uri
+print(f"[AutoVerify NG] Database backend: {_db_backend} "
+      f"(source: {'DATABASE_URL env var' if os.environ.get('DATABASE_URL') else 'default local SQLite file'})")
 
 # ---- Phase 2: simulated alert dispatch settings ----
 # By default alerts are logged to the console + alerts.log (fine for a demo).
@@ -1163,13 +1184,27 @@ def admin_alerts():
 @app.route("/health")
 @officer_login_required
 def health():
-    db_size_bytes = os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0
+    is_sqlite = app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite:///")
+    if is_sqlite:
+        db_size_display = f"{round(os.path.getsize(DB_PATH) / 1024, 1)} KB" if os.path.exists(DB_PATH) else "0 KB"
+    else:
+        # Postgres (or another non-SQLite backend): ask the database
+        # itself for its size rather than looking for a local file.
+        try:
+            size_bytes = db.session.execute(
+                db.text("SELECT pg_database_size(current_database())")
+            ).scalar()
+            db_size_display = f"{round(size_bytes / 1024, 1)} KB"
+        except Exception:
+            db_size_display = "N/A (could not query database size)"
+
     last_scan = ScanLog.query.order_by(ScanLog.timestamp.desc()).first()
 
     health_data = {
         "ocr_available": is_ocr_available(),
         "classifier_loaded": is_classifier_loaded(),
-        "db_size_kb": round(db_size_bytes / 1024, 1),
+        "db_backend": "SQLite" if is_sqlite else app.config["SQLALCHEMY_DATABASE_URI"].split("://", 1)[0],
+        "db_size_display": db_size_display,
         "vehicle_count": Vehicle.query.count(),
         "officer_count": Officer.query.count(),
         "scan_count": ScanLog.query.count(),

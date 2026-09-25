@@ -33,8 +33,8 @@
 
   <div class="col-md-6 col-lg-3">
     <div class="stat-card">
-      <div class="stat-label">Database Size</div>
-      <div class="stat-value">{{ health.db_size_kb }} KB</div>
+      <div class="stat-label">Database ({{ health.db_backend }})</div>
+      <div class="stat-value">{{ health.db_size_display }}</div>
     </div>
   </div>
 

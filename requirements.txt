@@ -3,6 +3,14 @@ Flask-SQLAlchemy==3.1.1
 Werkzeug==3.0.3
 gunicorn==22.0.0
 
+# This app is built and tested against SQLite (see app.py). psycopg2-binary
+# is included only as a safety net: if a DATABASE_URL environment variable
+# ever points at a PostgreSQL database (e.g. left over from another
+# project's Render settings), the app will connect instead of crashing
+# with "ModuleNotFoundError: No module named 'psycopg2'" — it does NOT
+# mean Postgres is required or actively used by default.
+psycopg2-binary==2.9.9
+
 # ---- Phase 2: real AI + image processing ----
 opencv-python-headless>=4.13.0
 pytesseract>=0.3.13
