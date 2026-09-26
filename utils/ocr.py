@@ -29,15 +29,19 @@ of the app keeps working during setup.
 import base64
 import logging
 import re
+import shutil
 
 import numpy as np
 import cv2
+from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger("autoverify.ocr")
 
 try:
     import pytesseract
-    _TESSERACT_OK = True
+    _TESSERACT_OK = shutil.which("tesseract") is not None
+    if not _TESSERACT_OK:
+        logger.warning("Tesseract binary not found on PATH — OCR will use fallback mode.")
 except ImportError:
     _TESSERACT_OK = False
     logger.warning("pytesseract not installed — OCR will use fallback mode.")
@@ -155,6 +159,112 @@ def _normalise_plate(raw_text):
     return None
 
 
+def _render_character_templates():
+    """Create simple letter/digit templates for fallback OCR when Tesseract is unavailable."""
+    chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    templates = {}
+    for ch in chars:
+        image = Image.new("L", (40, 40), 255)
+        draw = ImageDraw.Draw(image)
+        try:
+            font = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 28)
+        except Exception:
+            font = ImageFont.load_default()
+        draw.text((6, 4), ch, fill=0, font=font)
+        arr = np.array(image)
+        _, thresh = cv2.threshold(arr, 200, 255, cv2.THRESH_BINARY)
+        templates[ch] = thresh
+    return templates
+
+
+_TEMPLATE_CHARS = _render_character_templates()
+
+
+def _fallback_plate_from_crop(gray_crop):
+    """Best-effort OCR fallback using contour segmentation and template matching."""
+    if gray_crop is None or gray_crop.size == 0:
+        return None
+
+    _, binary = cv2.threshold(gray_crop, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
+
+    pieces = []
+    crop_h, crop_w = gray_crop.shape[:2]
+    for c in contours:
+        x, y, w, h = cv2.boundingRect(c)
+        area = cv2.contourArea(c)
+        if area < 25 or w < 6 or h < 10:
+            continue
+        if w > crop_w * 0.8 and h > crop_h * 0.8:
+            continue
+        if w * h > crop_w * crop_h * 0.6:
+            continue
+        aspect = w / max(h, 1)
+        if not (0.2 <= aspect <= 2.0):
+            continue
+        pieces.append((x, y, w, h))
+
+    if not pieces:
+        return None
+
+    pieces = sorted(pieces, key=lambda p: p[0])
+    chars = []
+    for x, y, w, h in pieces:
+        crop = gray_crop[y:y + h, x:x + w]
+        if crop.size == 0:
+            continue
+        crop = cv2.resize(crop, (32, 32), interpolation=cv2.INTER_AREA)
+        _, crop = cv2.threshold(crop, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        best_char = None
+        best_score = None
+        for candidate, template in _TEMPLATE_CHARS.items():
+            template = cv2.resize(template, (32, 32), interpolation=cv2.INTER_AREA)
+            diff = np.mean(np.abs(crop.astype(np.int16) - template.astype(np.int16)))
+            if best_score is None or diff < best_score:
+                best_score = diff
+                best_char = candidate
+        if best_char:
+            chars.append(best_char)
+
+    if not chars:
+        return None
+
+    text = "".join(chars)
+    text = re.sub(r"[^A-Z0-9]", "", text.upper())
+    if len(text) == 8 and re.fullmatch(r"[A-Z]{3}[0-9]{3}[A-Z]{2}", text):
+        return f"{text[:3]}-{text[3:6]}-{text[6:]}"
+    if len(text) >= 8:
+        candidate = text[:8]
+        if re.fullmatch(r"[A-Z0-9]{8}", candidate):
+            chars1 = candidate[:3]
+            chars2 = candidate[3:6]
+            chars3 = candidate[6:8]
+            if chars1.isalpha() and chars2.isdigit() and chars3.isalpha():
+                return f"{chars1}-{chars2}-{chars3}"
+    return None
+
+
+def _fallback_read_plate_from_image(img):
+    """Fallback OCR on full images / plate candidates when Tesseract is unavailable."""
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    candidates = _locate_plate_candidates(gray)
+    for x, y, w, h in candidates:
+        crop = gray[y:y + h, x:x + w]
+        plate = _fallback_plate_from_crop(crop)
+        if plate:
+            return plate
+
+    fallback = _fallback_plate_from_crop(gray)
+    if fallback:
+        return fallback
+
+    import random
+    logger.info("No confident plate match found by fallback OCR — using demo plate.")
+    return random.choice(_DEMO_FALLBACK_PLATES)
+
+
 # --------------------------------------------------------------------------
 # Public API (same signature as Phase 1 placeholder)
 # --------------------------------------------------------------------------
@@ -173,16 +283,15 @@ def read_plate(image_source=None):
         of the workflow keeps functioning end-to-end during development
         and demos.
     """
-    if not _TESSERACT_OK:
-        import random
-        logger.warning("Tesseract unavailable — returning fallback demo plate.")
-        return random.choice(_DEMO_FALLBACK_PLATES)
-
     img = _decode_image(image_source)
     if img is None:
         import random
         logger.warning("No usable image for OCR — returning fallback demo plate.")
         return random.choice(_DEMO_FALLBACK_PLATES)
+
+    if not _TESSERACT_OK:
+        logger.warning("Tesseract unavailable — using local OCR fallback path.")
+        return _fallback_read_plate_from_image(img)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -262,9 +371,9 @@ def locate_and_read_plates(image_source=None, max_results=10):
     img_h, img_w = gray.shape[:2]
 
     if not _TESSERACT_OK:
-        import random
-        logger.warning("Tesseract unavailable — returning single fallback plate for multi-scan.")
-        return [{"plate_number": random.choice(_DEMO_FALLBACK_PLATES), "bbox": (0, 0, img_w, img_h)}]
+        logger.warning("Tesseract unavailable — using local OCR fallback path for multi-scan.")
+        fallback_plate = _fallback_read_plate_from_image(img)
+        return [{"plate_number": fallback_plate, "bbox": (0, 0, img_w, img_h)}]
 
     candidates = _locate_plate_candidates(gray)
 

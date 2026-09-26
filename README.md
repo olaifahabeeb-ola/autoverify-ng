@@ -480,6 +480,8 @@ autoverify/
 ├── models_ml/                  # trained classifier lives here once you train it
 │   ├── vehicle_classifier.h5   # (created by utils/train_classifier.py)
 │   └── class_labels.json
+├── migrations/                  # Flask-Migrate/Alembic schema migrations (see DEPLOY.md section 5)
+│   └── versions/2bcef7fb5160_initial_schema.py
 ├── training_data/               # add your own labelled photos here (see section 5.3)
 ├── static/
 │   ├── uploads/                 # vehicle photos + scan captures

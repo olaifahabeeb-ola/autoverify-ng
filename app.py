@@ -12,6 +12,7 @@ from flask import (
     session, flash, jsonify, Response, abort
 )
 from werkzeug.utils import secure_filename
+from flask_migrate import Migrate
 
 from models import db, Vehicle, OwnerReport, Officer, ScanLog, AlertLog, OwnerNotification, BatchUpload, utcnow
 from utils.ocr import read_plate, locate_and_read_plates, is_ocr_available
@@ -24,6 +25,8 @@ ALERTS_LOG_PATH = os.path.join(BASE_DIR, "alerts.log")
 NOTIFICATIONS_LOG_PATH = os.path.join(BASE_DIR, "owner_notifications.log")
 DB_PATH = os.path.join(BASE_DIR, "autoverify.db")
 MAX_BATCH_IMAGES = 10
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "autoverify-ng-dev-secret-change-in-production")
@@ -42,6 +45,11 @@ app.config["SQLALCHEMY_DATABASE_URI"] = _database_url or (
     "sqlite:///" + os.path.join(BASE_DIR, "autoverify.db")
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,
+}
+if app.config["SQLALCHEMY_DATABASE_URI"].startswith(("postgres://", "postgresql://", "postgresql+psycopg2://")):
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"]["connect_args"] = {"sslmode": "require"}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB
 
@@ -68,6 +76,14 @@ app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD", "")
 app.config["ALERT_RECIPIENT"] = os.environ.get("ALERT_RECIPIENT", "control-room@example.com")
 
 db.init_app(app)
+
+# Flask-Migrate/Alembic — tracks schema changes going forward via
+# `flask db migrate` + `flask db upgrade`, instead of relying solely on
+# db.create_all() (which only creates missing tables and can never add a
+# new column to a table that already exists — a real risk once the
+# database is persistent, e.g. Postgres on Render, rather than an
+# ephemeral local SQLite file that gets wiped on every restart anyway).
+migrate = Migrate(app, db)
 
 mail = None
 if app.config["MAIL_ENABLED"]:
@@ -96,7 +112,7 @@ def send_alert(alert_type, plate_number, message, scan_log_id=None):
     print(f"\n🚨 {full_message}\n")
 
     try:
-        with open(ALERTS_LOG_PATH, "a") as f:
+        with open(ALERTS_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(full_message + "\n")
     except Exception as e:
         app.logger.warning("Could not write to alerts.log: %s", e)
@@ -147,7 +163,7 @@ def notify_owner(vehicle, message, scan_log_id=None):
     print(f"\n📩 {full_message}\n")
 
     try:
-        with open(NOTIFICATIONS_LOG_PATH, "a") as f:
+        with open(NOTIFICATIONS_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(full_message + "\n")
     except Exception as e:
         app.logger.warning("Could not write to owner_notifications.log: %s", e)
@@ -264,6 +280,8 @@ def save_uploaded_image(file_storage):
         return None
     if not allowed_file(file_storage.filename):
         return None
+
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     filename = secure_filename(file_storage.filename)
     stamped = f"{int(utcnow().timestamp())}_{filename}"
     full_path = os.path.join(app.config["UPLOAD_FOLDER"], stamped)
@@ -403,6 +421,7 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
         # visually compare against the real vehicle in front of them. This
         # matters most for manual/no-photo checks, where no AI comparison
         # runs at all (see build_and_persist_scan_result's no_image branch).
+        result["registered_image_path"] = vehicle.image_path
         result["registered_vehicle"] = {
             "make": vehicle.make,
             "model": vehicle.model,
@@ -595,6 +614,10 @@ def register():
             flash("An account with this email already exists.", "danger")
             return redirect(url_for("register"))
 
+        if not photo or photo.filename == "":
+            flash("Vehicle photo is required for registration.", "danger")
+            return redirect(url_for("register"))
+
         try:
             year_int = int(year)
         except ValueError:
@@ -748,24 +771,10 @@ def verify_post():
 
     vehicles_results = []
 
-    if manual_plate:
-        # Officer typed the plate manually (OCR was unclear, or no camera
-        # was used at all). Only run vehicle-attribute recognition if a
-        # photo was actually captured — otherwise there is nothing to
-        # recognize, and guessing would risk a false MISMATCH alert on a
-        # plate nobody actually looked at (see build_and_persist_scan_result).
-        if has_real_image:
-            recognized = recognize_vehicle(image_data_url)
-        else:
-            recognized = {"make": None, "model": None, "colour": None, "method": "no_image"}
-        vehicles_results.append(
-            build_and_persist_scan_result(manual_plate, recognized, session["officer_id"], gps_lat, gps_lon)
-        )
-    else:
-        # PHASE 3: MULTI-VEHICLE DETECTION — find every plate-shaped region
-        # in the frame (e.g. a checkpoint photo with several cars) and
-        # verify each one independently. Falls back to single-vehicle
-        # behaviour automatically if only one plate is found.
+    if has_real_image:
+        # Camera capture is the authoritative officer input. When a real
+        # image is present, ignore any manually typed plate value so the OCR
+        # / detection result drives the scan.
         detections = locate_and_read_plates(image_data_url, max_results=MAX_BATCH_IMAGES)
         for det in detections:
             recognized = recognize_vehicle(image_data_url, bbox=det.get("bbox"))
@@ -774,6 +783,14 @@ def verify_post():
                     det["plate_number"], recognized, session["officer_id"], gps_lat, gps_lon
                 )
             )
+    elif manual_plate:
+        # Officer typed the plate manually only when no camera photo was
+        # captured at all. In that case there is no real image to inspect, so
+        # we intentionally skip recognition rather than guessing attributes.
+        recognized = {"make": None, "model": None, "colour": None, "method": "no_image"}
+        vehicles_results.append(
+            build_and_persist_scan_result(manual_plate, recognized, session["officer_id"], gps_lat, gps_lon)
+        )
 
     # Overall alert severity across all detected vehicles, for the
     # full-screen overlay + voice alert (stolen takes priority over mismatch)
@@ -1272,12 +1289,33 @@ def seed_demo_data():
     db.session.commit()
 
 
-with app.app_context():
-    db.create_all()
+@app.cli.command("seed-demo")
+def seed_demo_cli():
+    """Flask CLI command: `flask seed-demo`. Seeds the demo officer/admin
+    accounts and demo vehicles (idempotent — safe to run on every deploy).
+    Run this AFTER `flask db upgrade` has created/updated the schema —
+    see the Dockerfile for the production startup sequence."""
     seed_demo_data()
+    print("Demo data seeded (or already present).")
 
 
 if __name__ == "__main__":
+    # This block only runs for direct `python app.py` execution (local
+    # dev via run_all.sh/run_all.bat) — NOT when gunicorn imports this
+    # module as a WSGI app, and NOT when the `flask db ...` / `flask
+    # seed-demo` CLI commands import it. For local dev against the
+    # default ephemeral SQLite file, create_all() + seeding on every
+    # startup is simple and sufficient — no migration history needed for
+    # a throwaway local database. Production (Docker/Render, typically
+    # backed by a persistent Postgres database) instead runs
+    # `flask db upgrade && flask seed-demo` explicitly before gunicorn
+    # starts — see the Dockerfile — so schema changes are tracked
+    # properly rather than relying on create_all(), which can never add
+    # a column to a table that already exists.
+    with app.app_context():
+        db.create_all()
+        seed_demo_data()
+
     # Render (and most PaaS hosts) inject a PORT env var — bind to it.
     # In production, Render runs this via Gunicorn instead (see Dockerfile),
     # so this block is really only used for local `python app.py` runs.

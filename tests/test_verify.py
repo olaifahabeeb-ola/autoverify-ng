@@ -103,6 +103,16 @@ class TestCameraCapture:
         assert resp.status_code == 200
         assert b"ABC-123-XY" in resp.data
 
+    def test_camera_capture_has_priority_over_manual_plate(self, officer_client):
+        image = _make_plate_image("ABC-123-XY")
+        resp = officer_client.post(
+            "/verify",
+            data={"image_data": image, "manual_plate": "ZZZ-999-QQ", "gps_lat": "9.05", "gps_lon": "7.49"},
+        )
+        assert resp.status_code == 200
+        assert b"ABC-123-XY" in resp.data
+        assert b"ZZZ-999-QQ" not in resp.data
+
     def test_unregistered_plate_flagged(self, officer_client):
         image = _make_plate_image("ZZZ-999-QQ")
         resp = officer_client.post("/verify", data={"image_data": image})

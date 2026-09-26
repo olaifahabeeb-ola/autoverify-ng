@@ -378,6 +378,61 @@ label, .form-label {
   font-weight: 600;
 }
 
+.dashboard-panel {
+  background: linear-gradient(180deg, var(--av-white) 0%, #fbfcfd 100%);
+}
+
+.panel-heading {
+  color: var(--av-primary);
+  font-weight: 700;
+}
+
+.dashboard-summary-card {
+  min-height: 120px;
+}
+
+.dashboard-vehicle-photo {
+  max-height: 200px;
+  width: 100%;
+  object-fit: cover;
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius);
+}
+
+.dashboard-empty-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 180px;
+  border-radius: var(--av-radius);
+  border: 1px dashed var(--av-border-strong);
+  background: var(--av-bg);
+}
+
+.dashboard-table th {
+  white-space: nowrap;
+  width: 1%;
+  color: var(--av-text-muted);
+}
+
+.scan-action-row {
+  gap: 0.75rem !important;
+}
+
+.scan-action-btn {
+  min-width: 180px;
+}
+
+.scan-priority-note {
+  background: var(--av-primary-soft);
+  border: 1px solid rgba(46, 125, 50, 0.18);
+  color: var(--av-primary-dark);
+  border-radius: var(--av-radius-sm);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 /* ==================================================================
    Full-screen priority alert overlay
    Kept intentionally strong/high-contrast (not the soft palette) since
@@ -444,6 +499,15 @@ label, .form-label {
     max-width: 100%;
   }
 
+  .scan-action-row {
+    flex-direction: column !important;
+  }
+
+  .scan-action-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
   .stat-card {
     padding: 1rem;
   }
@@ -481,6 +545,28 @@ label, .form-label {
 @media (max-width: 575.98px) {
   .d-flex.flex-wrap.gap-2.mb-4 > a {
     flex: 1 1 100%;
+  }
+}
+
+.comparison-photo {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.comparison-empty {
+  background-color: #f0f0f0;
+  color: #666;
+  padding: 40px 20px;
+  text-align: center;
+  border-radius: 8px;
+  border: 1px dashed #ccc;
+}
+
+@media (max-width: 768px) {
+  .comparison-photo {
+    max-height: 250px;
   }
 }
 

@@ -33,6 +33,9 @@ from models import db  # noqa: E402
 @pytest.fixture(scope="session", autouse=True)
 def _cleanup_test_db():
     yield
+    with flask_app_module.app.app_context():
+        db.session.remove()
+        db.engine.dispose()
     os.close(_TEST_DB_FD)
     if os.path.exists(_TEST_DB_PATH):
         os.remove(_TEST_DB_PATH)

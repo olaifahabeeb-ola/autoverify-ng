@@ -93,10 +93,9 @@ demo vehicles every time it starts up — so the app is always immediately
 usable after a restart. Just know that anything you add *during* one
 session (new registrations, stolen reports you filed, etc.) isn't
 guaranteed to survive a cold restart between sessions. If you need data to
-persist reliably (e.g. for a multi-day demo), the straightforward upgrade
-path is Render's paid tier with a persistent disk, or switching to a
-managed Postgres database — not necessary just to show the app working
-on your phone.
+persist reliably (e.g. for a multi-day demo or real usage), see section 5
+below for using a persistent Postgres database instead — every step in
+it has been tested end-to-end.
 
 **Build size/time.** TensorFlow is the heaviest dependency here and is
 only actually used once you've trained a real vehicle classifier (see
@@ -110,3 +109,56 @@ placeholder values (colour detection still works for real either way).
 **Every push redeploys.** Once connected, pushing to your GitHub branch
 automatically triggers a new build/deploy on Render — handy if you keep
 tweaking things.
+
+## 5. Using a persistent Postgres database (optional, for real data)
+
+By default the app uses a local SQLite file, which resets on every
+restart (see section 4). To keep data permanently instead:
+
+1. On Render: **New +** → **PostgreSQL** → create a database (the free
+   tier works fine for this project's scale).
+2. Copy its **Internal Database URL** from the database's own Render page.
+3. On your **AutoVerify NG web service** → **Environment** tab → add:
+   - `DATABASE_URL` = the Internal Database URL you copied
+4. Save — Render redeploys automatically.
+
+That's it — the app handles the rest automatically on every deploy:
+- Render's Postgres URL uses the old `postgres://` scheme; `app.py`
+  rewrites it to `postgresql://` (required by the SQLAlchemy version
+  this app uses) before connecting.
+- `psycopg2-binary` (the Postgres driver) is already in `requirements.txt`.
+- The Dockerfile's startup sequence runs `flask db upgrade` (applies any
+  pending schema migrations) and `flask seed-demo` (seeds the demo
+  accounts, idempotently) **before** starting the app — so the schema is
+  always current and the demo accounts always exist, without wiping any
+  real data you've added.
+
+**If you get an error like `relation "vehicles" already exists`** during
+deploy: this means your Postgres database already has tables from before
+migrations were introduced (e.g. it was previously initialised by the
+older `db.create_all()`-only code), so Alembic doesn't yet know those
+tables match its first migration. Fix this **once**, via Render's Shell
+tab (or `render exec` from the CLI) on your web service:
+```bash
+flask db stamp head
+```
+This tells Alembic "the schema is already at this migration's end state"
+without re-running any `CREATE TABLE` statements or touching your data.
+After that, deploys proceed normally.
+
+### Evolving the schema later
+
+If you change `models.py` again in the future (add a column, a new
+table, etc.), generate and commit a new migration **before** deploying:
+```bash
+export FLASK_APP=app.py
+flask db migrate -m "describe your change here"
+flask db upgrade   # optional: test it locally first, e.g. against SQLite
+git add migrations/
+git commit -m "Add migration: describe your change here"
+git push
+```
+Render will run `flask db upgrade` automatically on the next deploy,
+applying just that new migration on top of your existing data — no
+manual `stamp` step needed once migrations are already tracked.
+

@@ -3,6 +3,8 @@ Tests for Nigerian plate format validation (Phase 4) and the core
 "one plate -> one owner" business rule.
 """
 
+import io
+
 import pytest
 
 from app import normalize_and_validate_plate
@@ -66,7 +68,11 @@ class TestRegistrationPlateRules:
         assert b"Invalid plate format" in resp.data
 
     def test_valid_plate_is_accepted_and_normalized(self, client):
-        data = {**self.VALID_REGISTRATION, "plate_number": "kan123qw"}
+        data = {
+            **self.VALID_REGISTRATION,
+            "plate_number": "kan123qw",
+            "photo": (io.BytesIO(b"fake-image-data"), "vehicle.png"),
+        }
         resp = client.post("/register", data=data, follow_redirects=True)
         assert b"Invalid plate format" not in resp.data
 

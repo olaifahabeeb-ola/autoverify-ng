@@ -9,10 +9,31 @@
   </a>
 </div>
 
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="stat-card stat-ok dashboard-summary-card">
+      <div class="stat-label"><i class="fa-solid fa-user-tie"></i> Officers</div>
+      <div class="stat-value">{{ officers|length }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card stat-ok dashboard-summary-card">
+      <div class="stat-label"><i class="fa-solid fa-car-side"></i> Vehicles</div>
+      <div class="stat-value">{{ vehicles|length }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card stat-danger dashboard-summary-card">
+      <div class="stat-label"><i class="fa-solid fa-triangle-exclamation"></i> Active Reports</div>
+      <div class="stat-value">{{ reports|selectattr('is_active')|list|length }}</div>
+    </div>
+  </div>
+</div>
+
 <div class="row g-3">
   <div class="col-lg-5">
-    <div class="av-card p-4 mb-3">
-      <h6 class="mb-3" style="color: var(--av-primary);"><i class="fa-solid fa-user-plus"></i> Create Officer Account</h6>
+    <div class="av-card p-4 mb-3 dashboard-panel">
+      <h6 class="mb-3 panel-heading"><i class="fa-solid fa-user-plus"></i> Create Officer Account</h6>
       <form method="POST" action="{{ url_for('admin_create_officer') }}">
         <div class="mb-2">
           <label class="form-label">Full Name</label>
@@ -38,8 +59,8 @@
       </form>
     </div>
 
-    <div class="av-card p-4">
-      <h6 class="mb-3" style="color: var(--av-primary);"><i class="fa-solid fa-plus"></i> Manually Add to Hotlist</h6>
+    <div class="av-card p-4 dashboard-panel">
+      <h6 class="mb-3 panel-heading"><i class="fa-solid fa-plus"></i> Manually Add to Hotlist</h6>
       <form method="POST" action="{{ url_for('admin_hotlist_add') }}">
         <div class="mb-2">
           <label class="form-label">Plate Number</label>
@@ -55,11 +76,11 @@
   </div>
 
   <div class="col-lg-7">
-    <div class="av-card mb-3">
+    <div class="av-card mb-3 dashboard-panel">
       <div class="card-header">Officer Accounts</div>
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-sm mb-0">
+          <table class="table table-sm mb-0 dashboard-table">
             <thead><tr><th>Name</th><th>Username</th><th>Badge</th><th>Admin</th></tr></thead>
             <tbody>
               {% for o in officers %}
@@ -76,11 +97,11 @@
       </div>
     </div>
 
-    <div class="av-card mb-3">
+    <div class="av-card mb-3 dashboard-panel">
       <div class="card-header">All Registered Vehicles ({{ vehicles|length }})</div>
       <div class="card-body p-0">
         <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-          <table class="table table-sm mb-0">
+          <table class="table table-sm mb-0 dashboard-table">
             <thead><tr><th>Plate</th><th>Vehicle</th><th>Owner</th></tr></thead>
             <tbody>
               {% for v in vehicles %}
@@ -96,11 +117,11 @@
       </div>
     </div>
 
-    <div class="av-card mb-3">
+    <div class="av-card mb-3 dashboard-panel">
       <div class="card-header">All Owner Reports ({{ reports|length }})</div>
       <div class="card-body p-0">
         <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-          <table class="table table-sm mb-0">
+          <table class="table table-sm mb-0 dashboard-table">
             <thead><tr><th>Plate</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
               {% for r in reports %}
@@ -123,11 +144,11 @@
       </div>
     </div>
 
-    <div class="av-card">
+    <div class="av-card dashboard-panel">
       <div class="card-header">Recent Scan Logs</div>
       <div class="card-body p-0">
         <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-          <table class="table table-sm mb-0">
+          <table class="table table-sm mb-0 dashboard-table">
             <thead><tr><th>Time</th><th>Plate</th><th>Officer</th><th>Matched</th></tr></thead>
             <tbody>
               {% for s in scan_logs %}
@@ -144,11 +165,11 @@
       </div>
     </div>
 
-    <div class="av-card mt-3">
+    <div class="av-card mt-3 dashboard-panel">
       <div class="card-header"><i class="fa-solid fa-paper-plane"></i> Owner Notifications (Simulated SMS/Email)</div>
       <div class="card-body p-0">
         <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-          <table class="table table-sm mb-0">
+          <table class="table table-sm mb-0 dashboard-table">
             <thead><tr><th>Time</th><th>Vehicle</th><th>Message</th><th>Channel</th></tr></thead>
             <tbody>
               {% for n in owner_notifications %}
@@ -167,11 +188,11 @@
       </div>
     </div>
 
-    <div class="av-card mt-3">
+    <div class="av-card mt-3 dashboard-panel">
       <div class="card-header"><i class="fa-solid fa-layer-group"></i> Batch Upload History</div>
       <div class="card-body p-0">
         <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-          <table class="table table-sm mb-0">
+          <table class="table table-sm mb-0 dashboard-table">
             <thead><tr><th>Time</th><th>Officer</th><th>Images</th><th>Stolen</th><th>Mismatch</th></tr></thead>
             <tbody>
               {% for b in batch_uploads %}
