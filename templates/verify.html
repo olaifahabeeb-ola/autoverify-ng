@@ -24,6 +24,8 @@
         <i class="fa-solid fa-bolt"></i> Camera scan is the primary officer workflow. Manual plate entry is only a fallback when no real image is captured.
       </div>
 
+      <div id="camera-status" class="alert alert-info mt-3 mb-0 d-none" role="status" aria-live="polite"></div>
+
       <p class="text-muted small mt-2 mb-0">
         <i class="fa-solid fa-circle-info"></i>
         Automatically detects <strong>multiple vehicles</strong> in one photo (e.g. a checkpoint
@@ -55,7 +57,7 @@
     </div>
   </div>
 
-  <div class="col-lg-6">
+  <div class="col-lg-6" id="scan-results-panel">
     {% if vehicles %}
       {% if multi_vehicle %}
       <p class="text-muted mb-2">
@@ -226,6 +228,7 @@ const form = document.getElementById('verify-form');
 const imageDataInput = document.getElementById('image_data');
 const gpsLatInput = document.getElementById('gps_lat');
 const gpsLonInput = document.getElementById('gps_lon');
+const cameraStatus = document.getElementById('camera-status');
 
 const manualForm = document.getElementById('manual-form');
 const manualGpsLat = document.getElementById('manual_gps_lat');
@@ -235,15 +238,31 @@ let stream = null;
 let lastGpsLat = null;
 let lastGpsLon = null;
 
+function showCameraStatus(message, type = 'info') {
+  cameraStatus.className = `alert mt-3 mb-0 alert-${type}`;
+  cameraStatus.textContent = message;
+  cameraStatus.classList.remove('d-none');
+}
+
+function hideCameraStatus() {
+  cameraStatus.classList.add('d-none');
+  cameraStatus.textContent = '';
+}
+
 startBtn.addEventListener('click', async () => {
   try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showCameraStatus('This browser cannot access the camera. Use a modern phone browser or desktop camera-enabled browser.', 'danger');
+      return;
+    }
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
     video.srcObject = stream;
     captureBtn.disabled = false;
     startBtn.textContent = "Camera Active";
     startBtn.disabled = true;
+    showCameraStatus('Camera ready. Capture the plate in clear light for the best OCR result.', 'success');
   } catch (err) {
-    alert("Could not access camera: " + err.message + "\nMake sure you've granted camera permission.");
+    showCameraStatus('Could not access camera: ' + (err && err.message ? err.message : 'permission denied') + '. Grant camera permission and retry.', 'danger');
   }
 });
 
@@ -266,25 +285,45 @@ refreshGps();
 setInterval(refreshGps, 15000);
 
 captureBtn.addEventListener('click', () => {
-  if (!stream) return;
+  if (!stream || !video.videoWidth || !video.videoHeight) {
+    showCameraStatus('Camera is not ready yet. Start the camera and wait for the live view to load.', 'warning');
+    return;
+  }
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  try {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  const dataUrl = canvas.toDataURL('image/png');
-  imageDataInput.value = dataUrl;
-  document.getElementById('manual_image_data').value = dataUrl;
+    const dataUrl = canvas.toDataURL('image/png');
+    if (!dataUrl || dataUrl.length < 200) {
+      showCameraStatus('The photo could not be captured. Please retry the scan.', 'danger');
+      return;
+    }
 
-  captureBtn.disabled = true;
-  captureBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verifying...';
+    imageDataInput.value = dataUrl;
+    document.getElementById('manual_image_data').value = dataUrl;
 
-  submitWithOfflineCheck(form, imageDataInput.value);
+    captureBtn.disabled = true;
+    captureBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verifying...';
+    showCameraStatus('Capturing and verifying the plate...', 'info');
+
+    submitWithOfflineCheck(form, imageDataInput.value);
+  } catch (err) {
+    showCameraStatus('The camera capture failed. Please retry and keep the plate in clear view.', 'danger');
+  }
 });
 
 manualForm.addEventListener('submit', (e) => {
   e.preventDefault();
+  const plateInput = manualForm.querySelector('[name="manual_plate"]');
+  if (!plateInput || !plateInput.value.trim()) {
+    showCameraStatus('Enter a plate number before submitting the manual check.', 'warning');
+    plateInput.focus();
+    return;
+  }
+  hideCameraStatus();
   submitWithOfflineCheck(manualForm, null);
 });
 
@@ -323,13 +362,14 @@ function setOnlineBanner(offline) {
   banner.classList.toggle('d-none', !offline);
 }
 
-function submitWithOfflineCheck(formEl, dataUrl) {
+async function submitWithOfflineCheck(formEl, dataUrl) {
   // Best-effort: if the browser is offline, we can't run server-side OCR,
   // so just warn the officer to check the plate manually against the
-  // cached hotlist. When online, submit normally to the server which does
-  // the real OCR + database lookup.
+  // cached hotlist. When online, submit via fetch so the page does not
+  // appear to restart or go black on mobile after taking a photo.
   if (!navigator.onLine) {
     setOnlineBanner(true);
+    showCameraStatus('You are offline. Use the cached hotlist check until the connection returns.', 'warning');
     const manualPlate = formEl.querySelector('[name="manual_plate"]');
     if (manualPlate && manualPlate.value) {
       const plate = manualPlate.value.toUpperCase().replace(/\s/g, '');
@@ -340,7 +380,40 @@ function submitWithOfflineCheck(formEl, dataUrl) {
       }
     }
   }
-  formEl.submit();
+
+  try {
+    showCameraStatus('Submitting scan to the verification system...', 'info');
+    const formData = new FormData(formEl);
+    const response = await fetch(formEl.action || window.location.pathname, {
+      method: 'POST',
+      body: formData,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+
+    if (!response.ok) {
+      throw new Error('Submission failed');
+    }
+
+    const html = await response.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const replacement = doc.getElementById('scan-results-panel');
+    const target = document.getElementById('scan-results-panel');
+    if (replacement && target) {
+      target.innerHTML = replacement.innerHTML;
+    }
+    if (formEl.id === 'verify-form') {
+      captureBtn.disabled = false;
+      captureBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Capture &amp; Verify';
+    }
+    hideCameraStatus();
+  } catch (err) {
+    showCameraStatus('The scan could not be submitted. Check your connection and retry.', 'danger');
+    if (formEl.id === 'verify-form') {
+      captureBtn.disabled = false;
+      captureBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Capture &amp; Verify';
+    }
+  }
 }
 
 window.addEventListener('online', () => syncHotlistCache());

@@ -522,6 +522,7 @@ def index():
 
 
 @app.route("/api/dashboard-stats")
+@officer_login_required
 def api_dashboard_stats():
     """
     PHASE 2: JSON data for the enhanced dashboard charts
