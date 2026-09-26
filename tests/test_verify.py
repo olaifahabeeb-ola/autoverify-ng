@@ -15,6 +15,8 @@ import cv2
 import numpy as np
 import base64
 
+from utils.ocr import locate_and_read_plates
+
 
 def _make_plate_image(text):
     """Build a synthetic image containing a rectangle with plate-style text,
@@ -97,6 +99,15 @@ class TestManualEntryWithPhoto:
 
 
 class TestCameraCapture:
+    def test_unreadable_image_does_not_invent_a_random_plate(self):
+        img = np.full((400, 600, 3), 200, dtype=np.uint8)
+        ok, buf = cv2.imencode(".png", img)
+        assert ok
+        image = "data:image/png;base64," + base64.b64encode(buf).decode()
+
+        detections = locate_and_read_plates(image, max_results=5)
+        assert detections == []
+
     def test_real_photo_ocr_reads_plate_correctly(self, officer_client):
         image = _make_plate_image("ABC-123-XY")
         resp = officer_client.post("/verify", data={"image_data": image, "gps_lat": "9.05", "gps_lon": "7.49"})

@@ -327,6 +327,26 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
     against a fabricated guess, which would otherwise risk a false
     MISMATCH alert on a plate that was never actually looked at.
     """
+    if not plate_number:
+        return {
+            "plate_number": None,
+            "recognized_make": None,
+            "recognized_model": None,
+            "recognized_colour": None,
+            "recognition_method": None,
+            "visually_verified": False,
+            "status": "error",
+            "message": "No readable plate found in the captured image. Please retake the photo and try again.",
+            "notes": ["ℹ️ The scan could not confidently read a plate number from this image. No plate was assumed."],
+            "owner_info": None,
+            "registered_vehicle": None,
+            "trigger_alert": False,
+            "alert_type": None,
+            "registered_image_path": None,
+            "owner_notified": False,
+        }
+
+    recognized = recognized or {"make": None, "model": None, "colour": None, "method": "no_image"}
     vehicle = Vehicle.query.filter_by(plate_number=plate_number).first()
     visually_verified = recognized.get("method") != "no_image"
 

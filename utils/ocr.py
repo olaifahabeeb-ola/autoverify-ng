@@ -260,9 +260,8 @@ def _fallback_read_plate_from_image(img):
     if fallback:
         return fallback
 
-    import random
-    logger.info("No confident plate match found by fallback OCR — using demo plate.")
-    return random.choice(_DEMO_FALLBACK_PLATES)
+    logger.info("No confident plate match found by fallback OCR — no plate was read from this image.")
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -285,9 +284,8 @@ def read_plate(image_source=None):
     """
     img = _decode_image(image_source)
     if img is None:
-        import random
-        logger.warning("No usable image for OCR — returning fallback demo plate.")
-        return random.choice(_DEMO_FALLBACK_PLATES)
+        logger.warning("No usable image for OCR — no plate was read.")
+        return None
 
     if not _TESSERACT_OK:
         logger.warning("Tesseract unavailable — using local OCR fallback path.")
@@ -321,10 +319,9 @@ def read_plate(image_source=None):
     except Exception as exc:
         logger.warning("Tesseract error on full frame: %s", exc)
 
-    # 3) Nothing confident found — fall back so the app still demos cleanly
-    import random
-    logger.info("No confident plate match found by OCR — using fallback demo plate.")
-    return random.choice(_DEMO_FALLBACK_PLATES)
+    # 3) Nothing confident found — do not invent a plate number.
+    logger.info("No confident plate match found by OCR — no plate was read from the image.")
+    return None
 
 
 def is_ocr_available():
@@ -363,9 +360,8 @@ def locate_and_read_plates(image_source=None, max_results=10):
     """
     img = _decode_image(image_source)
     if img is None:
-        import random
-        logger.warning("No usable image for multi-plate OCR — returning single fallback plate.")
-        return [{"plate_number": random.choice(_DEMO_FALLBACK_PLATES), "bbox": None}]
+        logger.warning("No usable image for multi-plate OCR — no plate was read.")
+        return []
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img_h, img_w = gray.shape[:2]
@@ -373,6 +369,8 @@ def locate_and_read_plates(image_source=None, max_results=10):
     if not _TESSERACT_OK:
         logger.warning("Tesseract unavailable — using local OCR fallback path for multi-scan.")
         fallback_plate = _fallback_read_plate_from_image(img)
+        if not fallback_plate:
+            return []
         return [{"plate_number": fallback_plate, "bbox": (0, 0, img_w, img_h)}]
 
     candidates = _locate_plate_candidates(gray)
@@ -400,6 +398,9 @@ def locate_and_read_plates(image_source=None, max_results=10):
         return results
 
     # No plate-shaped contours found at all — fall back to single-plate
-    # behaviour (whole-frame OCR, then demo fallback), same as read_plate().
+    # behaviour. If no plate is readable, return no detections instead of
+    # inventing one.
     single_plate = read_plate(image_source)
+    if not single_plate:
+        return []
     return [{"plate_number": single_plate, "bbox": (0, 0, img_w, img_h)}]
