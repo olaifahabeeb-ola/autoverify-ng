@@ -4,6 +4,11 @@ Tests for owner login, officer login, and role-based access control.
 
 
 class TestOwnerLogin:
+    def test_root_redirects_owner_to_dashboard(self, owner_client):
+        resp = owner_client.get("/", follow_redirects=False)
+        assert resp.status_code == 302
+        assert resp.headers["Location"].endswith("/owner/dashboard")
+
     def test_correct_credentials_succeed(self, client):
         resp = client.post(
             "/login",
@@ -40,6 +45,11 @@ class TestOwnerLogin:
 
 
 class TestOfficerLogin:
+    def test_root_redirects_officer_to_verification(self, officer_client):
+        resp = officer_client.get("/", follow_redirects=False)
+        assert resp.status_code == 302
+        assert resp.headers["Location"].endswith("/verify")
+
     def test_correct_credentials_succeed(self, client):
         resp = client.post(
             "/officer/login",
@@ -63,6 +73,14 @@ class TestOfficerLogin:
 
 class TestAccessControl:
     """Non-admin officers must not reach admin-only routes."""
+
+    def test_public_root_hides_system_stats(self, client):
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert b"Owner Login" in resp.data
+        assert b"Officer Login" in resp.data
+        assert b"Scans Today" not in resp.data
+        assert b"Total" not in resp.data
 
     def test_admin_panel_blocked_for_regular_officer(self, officer_client):
         resp = officer_client.get("/admin", follow_redirects=True)

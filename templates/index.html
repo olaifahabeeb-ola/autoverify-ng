@@ -3,11 +3,10 @@
 {% block content %}
 
 {% if not session.get('vehicle_id') and not session.get('officer_id') %}
-<!-- Public landing page hero (shown to logged-out visitors) -->
 <div class="hero-section text-center py-5 mb-4">
   <div class="mb-3" style="font-size: 2.75rem;">🚗</div>
   <h1 class="hero-title">AutoVerify <span style="color: var(--av-primary);">NG</span></h1>
-  <p class="hero-tagline">Real-time vehicle plate verification and citizen reporting for safer Nigerian roads</p>
+  <p class="hero-tagline">Choose your role to continue securely</p>
 
   <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
     <a href="{{ url_for('register') }}" class="btn btn-av-primary btn-lg">
@@ -23,36 +22,34 @@
 
   <div class="row g-3 mt-4 justify-content-center">
     <div class="col-6 col-md-3">
+      <i class="fa-solid fa-shield-halved fa-2x mb-2" style="color: var(--av-primary);"></i>
+      <p class="small text-muted mb-0">Role-based access only</p>
+    </div>
+    <div class="col-6 col-md-3">
+      <i class="fa-solid fa-car fa-2x mb-2" style="color: var(--av-primary);"></i>
+      <p class="small text-muted mb-0">Owner vehicle dashboard</p>
+    </div>
+    <div class="col-6 col-md-3">
       <i class="fa-solid fa-camera fa-2x mb-2" style="color: var(--av-primary);"></i>
-      <p class="small text-muted mb-0">Real OCR plate reading</p>
+      <p class="small text-muted mb-0">Officer verification tools</p>
     </div>
     <div class="col-6 col-md-3">
-      <i class="fa-solid fa-triangle-exclamation fa-2x mb-2" style="color: var(--av-amber-text);"></i>
-      <p class="small text-muted mb-0">Instant stolen-vehicle alerts</p>
-    </div>
-    <div class="col-6 col-md-3">
-      <i class="fa-solid fa-location-dot fa-2x mb-2" style="color: var(--av-primary);"></i>
-      <p class="small text-muted mb-0">GPS-tagged scan logs</p>
-    </div>
-    <div class="col-6 col-md-3">
-      <i class="fa-solid fa-users fa-2x mb-2" style="color: var(--av-primary);"></i>
-      <p class="small text-muted mb-0">Citizen ownership reporting</p>
+      <i class="fa-solid fa-user-shield fa-2x mb-2" style="color: var(--av-primary);"></i>
+      <p class="small text-muted mb-0">Admin-only analytics</p>
     </div>
   </div>
 </div>
 {% endif %}
 
+{% if session.get('officer_id') %}
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-  <h3 class="section-title mb-0">
-    {% if session.get('officer_id') %}Control Room Dashboard{% else %}Live System Stats{% endif %}
-  </h3>
+  <h3 class="section-title mb-0">Control Room Dashboard</h3>
   <div class="text-end">
     <div id="live-clock" class="fw-bold fs-5"></div>
     <div id="live-date" class="text-muted small"></div>
   </div>
 </div>
 
-{% if session.get('officer_id') %}
 <div class="d-flex flex-wrap gap-2 mb-4">
   <a href="{{ url_for('verify') }}" class="btn btn-av-primary btn-lg">
     <i class="fa-solid fa-camera"></i> Scan Vehicle
@@ -75,7 +72,6 @@
   </a>
   {% endif %}
 </div>
-{% endif %}
 
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">
@@ -164,6 +160,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 {% endblock %}
 

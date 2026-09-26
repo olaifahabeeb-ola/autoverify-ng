@@ -511,32 +511,14 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
 
 @app.route("/")
 def index():
-    total_vehicles = Vehicle.query.count()
-    today = date.today()
+    if session.get("vehicle_id"):
+        return redirect(url_for("owner_dashboard"))
+    if session.get("officer_id"):
+        if session.get("is_admin"):
+            return redirect(url_for("admin"))
+        return redirect(url_for("verify"))
 
-    scans_today = ScanLog.query.filter(
-        db.func.date(ScanLog.timestamp) == today
-    ).count()
-
-    active_stolen = OwnerReport.query.filter_by(
-        report_type="stolen", is_active=True
-    ).count()
-
-    mismatches_today = ScanLog.query.filter(
-        db.func.date(ScanLog.timestamp) == today,
-        ScanLog.matched == False  # noqa: E712
-    ).count()
-
-    recent_scans = ScanLog.query.order_by(ScanLog.timestamp.desc()).limit(10).all()
-
-    return render_template(
-        "index.html",
-        total_vehicles=total_vehicles,
-        scans_today=scans_today,
-        active_stolen=active_stolen,
-        mismatches_today=mismatches_today,
-        recent_scans=recent_scans,
-    )
+    return render_template("index.html")
 
 
 @app.route("/api/dashboard-stats")
@@ -796,13 +778,35 @@ def verify_post():
         # image is present, ignore any manually typed plate value so the OCR
         # / detection result drives the scan.
         detections = locate_and_read_plates(image_data_url, max_results=MAX_BATCH_IMAGES)
-        for det in detections:
-            recognized = recognize_vehicle(image_data_url, bbox=det.get("bbox"))
-            vehicles_results.append(
-                build_and_persist_scan_result(
-                    det["plate_number"], recognized, session["officer_id"], gps_lat, gps_lon
+        if not detections:
+            vehicles_results.append({
+                "plate_number": None,
+                "recognized_make": None,
+                "recognized_model": None,
+                "recognized_colour": None,
+                "recognition_method": None,
+                "visually_verified": False,
+                "status": "error",
+                "message": "No readable plate found in the captured image. Please retake the photo in better light and from a clearer angle.",
+                "notes": [
+                    "ℹ️ The camera image did not produce a reliable plate read. No random or assumed plate number was inserted.",
+                    "ℹ️ Try a sharper, front-facing, well-lit shot of the registration plate."
+                ],
+                "owner_info": None,
+                "registered_vehicle": None,
+                "trigger_alert": False,
+                "alert_type": None,
+                "registered_image_path": None,
+                "owner_notified": False,
+            })
+        else:
+            for det in detections:
+                recognized = recognize_vehicle(image_data_url, bbox=det.get("bbox"))
+                vehicles_results.append(
+                    build_and_persist_scan_result(
+                        det["plate_number"], recognized, session["officer_id"], gps_lat, gps_lon
+                    )
                 )
-            )
     elif manual_plate:
         # Officer typed the plate manually only when no camera photo was
         # captured at all. In that case there is no real image to inspect, so
