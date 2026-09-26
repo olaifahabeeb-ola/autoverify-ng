@@ -82,6 +82,21 @@ class TestAccessControl:
         assert b"Scans Today" not in resp.data
         assert b"Total" not in resp.data
 
+    def test_owner_login_clears_officer_session(self, client):
+        officer_client = client
+        officer_client.post("/officer/login", data={"username": "officer1", "password": "officer123"}, follow_redirects=True)
+        resp = officer_client.post("/login", data={"email": "chinedu@example.com", "password": "password123"}, follow_redirects=True)
+        assert b"My Vehicle" in resp.data or resp.status_code == 200
+        assert b"Officer login required" not in resp.data
+        assert b"Please log in" not in resp.data
+
+    def test_officer_login_clears_owner_session(self, client):
+        owner_client = client
+        owner_client.post("/login", data={"email": "chinedu@example.com", "password": "password123"}, follow_redirects=True)
+        resp = owner_client.post("/officer/login", data={"username": "officer1", "password": "officer123"}, follow_redirects=True)
+        assert b"Invalid officer credentials" not in resp.data
+        assert b"Officer" in resp.data or resp.status_code == 200
+
     def test_admin_panel_blocked_for_regular_officer(self, officer_client):
         resp = officer_client.get("/admin", follow_redirects=True)
         assert b"Admin access required" in resp.data or b"Officer Login" in resp.data

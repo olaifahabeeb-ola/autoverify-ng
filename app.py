@@ -659,6 +659,8 @@ def login():
 
         vehicle = Vehicle.query.filter_by(owner_email=email).first()
         if vehicle and vehicle.check_password(password):
+            session.pop("officer_id", None)
+            session.pop("is_admin", None)
             session["vehicle_id"] = vehicle.id
             flash(f"Welcome back, {vehicle.owner_name}!", "success")
             return redirect(url_for("owner_dashboard"))
@@ -735,6 +737,7 @@ def officer_login():
 
         officer = Officer.query.filter_by(username=username).first()
         if officer and officer.check_password(password):
+            session.pop("vehicle_id", None)
             session["officer_id"] = officer.id
             session["is_admin"] = officer.is_admin
             flash(f"Welcome, Officer {officer.full_name}.", "success")
