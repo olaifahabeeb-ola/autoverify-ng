@@ -4,12 +4,12 @@ Flask-Migrate==4.0.7
 Werkzeug==3.0.3
 gunicorn==22.0.0
 
-# This app is built and tested against SQLite (see app.py). psycopg2-binary
-# is included only as a safety net: if a DATABASE_URL environment variable
-# ever points at a PostgreSQL database (e.g. left over from another
-# project's Render settings), the app will connect instead of crashing
-# with "ModuleNotFoundError: No module named 'psycopg2'" — it does NOT
-# mean Postgres is required or actively used by default.
+# PostgreSQL driver required by SQLAlchemy 2 for Render/Postgres URLs.
+# The dialect used by SQLAlchemy for postgres databases is the `psycopg`
+# package (`sqlalchemy.dialects.postgresql.psycopg`), so installing only
+# `psycopg2-binary` is not sufficient for `postgresql://` URLs.
+# Keep both installed for compatibility with older code paths and Render.
+psycopg[binary]==3.2.1
 psycopg2-binary==2.9.9
 
 # ---- Phase 2: real AI + image processing ----
