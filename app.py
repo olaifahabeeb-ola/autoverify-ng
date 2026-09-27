@@ -293,9 +293,23 @@ def save_uploaded_image(file_storage):
 
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     filename = secure_filename(file_storage.filename)
+    # Ensure unique filename and avoid collisions by prefixing with timestamp
     stamped = f"{int(utcnow().timestamp())}_{filename}"
     full_path = os.path.join(app.config["UPLOAD_FOLDER"], stamped)
-    file_storage.save(full_path)
+    try:
+        file_storage.save(full_path)
+    except Exception as e:
+        app.logger.warning("Failed to save uploaded file: %s", e)
+        return None
+    # Double-check file was written before returning path
+    if not os.path.exists(full_path) or os.path.getsize(full_path) == 0:
+        app.logger.warning("Uploaded file not present after save: %s", full_path)
+        try:
+            if os.path.exists(full_path):
+                os.remove(full_path)
+        except Exception:
+            pass
+        return None
     return f"uploads/{stamped}"
 
 

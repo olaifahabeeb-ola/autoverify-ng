@@ -158,6 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const replacement = doc.getElementById('scan-results-panel');
       const target = document.getElementById('scan-results-panel');
       if (replacement && target) target.innerHTML = replacement.innerHTML;
+      // After injecting server-rendered results, run alert processing
+      processScanResultsForAlerts();
       if (formEl.id === 'verify-form') {
         captureBtn.disabled = false;
         captureBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Capture &amp; Verify';
@@ -206,13 +208,33 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.classList.add('d-none'); sound.pause();
   });
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const cards = document.querySelectorAll('#vehicle-result-list [data-status]');
-    if (!cards.length) return;
-    let worstStatus = null; let worstMessage = ''; let alertCount = 0;
-    cards.forEach(card => {
-      const status = card.dataset.status; if (status === 'stolen' || status === 'mismatch') { alertCount++; if (status === 'stolen' && worstStatus !== 'stolen') { worstStatus = 'stolen'; worstMessage = card.dataset.message; } else if (status === 'mismatch' && worstStatus === null) { worstStatus = 'mismatch'; worstMessage = card.dataset.message; } }
-    });
-    if (worstStatus) { triggerFullAlert(worstStatus, worstMessage); speakAlert(worstStatus, alertCount); }
-  });
+    function processScanResultsForAlerts() {
+      const cards = document.querySelectorAll('#vehicle-result-list [data-status]');
+      if (!cards.length) return;
+
+      let worstStatus = null;
+      let worstMessage = '';
+      let alertCount = 0;
+      cards.forEach(card => {
+        const status = card.dataset.status;
+        if (status === 'stolen' || status === 'mismatch') {
+          alertCount++;
+          if (status === 'stolen' && worstStatus !== 'stolen') {
+            worstStatus = 'stolen';
+            worstMessage = card.dataset.message;
+          } else if (status === 'mismatch' && worstStatus === null) {
+            worstStatus = 'mismatch';
+            worstMessage = card.dataset.message;
+          }
+        }
+      });
+
+      if (worstStatus) {
+        triggerFullAlert(worstStatus, worstMessage);
+        speakAlert(worstStatus, alertCount);
+      }
+    }
+
+    // Run once on initial page load in case the server rendered results.
+    processScanResultsForAlerts();
 });
