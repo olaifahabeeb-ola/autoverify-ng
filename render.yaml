@@ -1,0 +1,16 @@
+# Render service manifest for AutoVerify NG
+# See https://render.com/docs/deploy-using-manifest for details
+services:
+  - type: web
+    name: autoverify-ng
+    env: docker
+    branch: main
+    plan: free
+    repo: <replace-with-your-github-ssh-or-https-repo-url>
+    buildCommand: ''
+    startCommand: ''
+    envVars:
+      - key: SECRET_KEY
+        value: "REPLACE_WITH_RANDOM_SECRET"
+      - key: FLASK_DEBUG
+        value: "0"
