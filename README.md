@@ -103,6 +103,21 @@ python3 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 python app.py
+
+#### Windows notes (common issues)
+
+- Install the UB Mannheim Tesseract build and ensure the install path (for example `C:\Program Files\Tesseract-OCR`) is added to your System PATH. After adding to PATH, restart your terminal / PowerShell session.
+- If `eng.traineddata` is missing for any reason, the app can use the repository-local `tessdata/eng.traineddata` file. You can also set the `TESSDATA_PREFIX` environment variable to the tessdata folder, e.g.:
+
+```powershell
+setx TESSDATA_PREFIX "C:\Program Files\Tesseract-OCR\tessdata"
+# Restart your terminal after running setx
+```
+
+#### Quick local diagnostic endpoints
+
+- Start the app (`python app.py`) and visit `/health` to see whether the app believes real OCR is active.
+- Visit `/diag` to receive JSON with low-level diagnostics (`cv2` present, `tesseract` on PATH, `TESSDATA_PREFIX`, and `ocr_available`).
 ```
 
 The app starts on **http://localhost:5000**. On first run it automatically

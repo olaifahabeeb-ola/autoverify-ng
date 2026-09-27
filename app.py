@@ -771,6 +771,31 @@ def verify():
     return render_template("verify.html")
 
 
+@app.route("/diag")
+def diag():
+    """Return simple JSON diagnostics useful for debugging OCR/startup issues."""
+    info = {}
+    try:
+        from utils import ocr as _ocr_module
+        import cv2
+        info["cv2"] = True
+    except Exception as e:
+        info["cv2"] = False
+        info.setdefault("errors", []).append(f"cv2: {e}")
+
+    try:
+        from utils import ocr as _ocr_module
+        import shutil, os
+        info["tesseract_on_path"] = bool(shutil.which("tesseract"))
+        info["_TESSERACT_PATH"] = getattr(_ocr_module, "_TESSERACT_PATH", None)
+        info["TESSDATA_PREFIX"] = os.environ.get("TESSDATA_PREFIX")
+        info["ocr_available"] = _ocr_module.is_ocr_available()
+    except Exception as e:
+        info.setdefault("errors", []).append(str(e))
+
+    return jsonify(info)
+
+
 @app.route("/verify", methods=["POST"])
 @officer_login_required
 def verify_post():
