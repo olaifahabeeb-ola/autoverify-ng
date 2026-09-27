@@ -4,8 +4,8 @@
 
 {% if not session.get('vehicle_id') and not session.get('officer_id') %}
 <div class="hero-section text-center py-5 mb-4">
-  <div class="mb-3" style="font-size: 2.75rem;">🚗</div>
-  <h1 class="hero-title">AutoVerify <span style="color: var(--av-primary);">NG</span></h1>
+  <div class="mb-3 hero-emoji">🚗</div>
+  <h1 class="hero-title">AutoVerify <span class="text-av-primary">NG</span></h1>
   <p class="hero-tagline">Choose your role to continue securely</p>
 
   <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
@@ -22,19 +22,19 @@
 
   <div class="row g-3 mt-4 justify-content-center">
     <div class="col-6 col-md-3">
-      <i class="fa-solid fa-shield-halved fa-2x mb-2" style="color: var(--av-primary);"></i>
+      <i class="fa-solid fa-shield-halved fa-2x mb-2 text-av-primary"></i>
       <p class="small text-muted mb-0">Role-based access only</p>
     </div>
     <div class="col-6 col-md-3">
-      <i class="fa-solid fa-car fa-2x mb-2" style="color: var(--av-primary);"></i>
+      <i class="fa-solid fa-car fa-2x mb-2 text-av-primary"></i>
       <p class="small text-muted mb-0">Owner vehicle dashboard</p>
     </div>
     <div class="col-6 col-md-3">
-      <i class="fa-solid fa-camera fa-2x mb-2" style="color: var(--av-primary);"></i>
+      <i class="fa-solid fa-camera fa-2x mb-2 text-av-primary"></i>
       <p class="small text-muted mb-0">Officer verification tools</p>
     </div>
     <div class="col-6 col-md-3">
-      <i class="fa-solid fa-user-shield fa-2x mb-2" style="color: var(--av-primary);"></i>
+      <i class="fa-solid fa-user-shield fa-2x mb-2 text-av-primary"></i>
       <p class="small text-muted mb-0">Admin-only analytics</p>
     </div>
   </div>
@@ -165,16 +165,8 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Live clock moved to static/js/index.js for CSP compliance -->
 <script>
-// ---------- Live clock ----------
-function updateClock() {
-  const now = new Date();
-  document.getElementById('live-clock').textContent = now.toLocaleTimeString();
-  document.getElementById('live-date').textContent = now.toLocaleDateString(undefined, {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  });
-}
-updateClock();
-setInterval(updateClock, 1000);
+// noop to preserve block if index.js not loaded early
 </script>
 {% endblock %}

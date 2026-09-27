@@ -14,7 +14,7 @@
       Only the first 10 files are processed if you select more.
     </p>
     <div id="batch-progress" class="d-none mt-3">
-      <div class="progress" style="height: 22px;">
+      <div class="progress progress-small">
         <div id="batch-progress-bar" class="progress-bar bg-danger" role="progressbar" style="width: 100%">
           Processing images, please wait...
         </div>
@@ -89,22 +89,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-// PHASE 3: simple progress indicator for batch uploads. A true live
-// progress bar would need server-sent events / websockets to report
-// per-image completion; for a synchronous form POST, we show an
-// indeterminate "processing" state while the browser uploads and the
-// server works through the batch, which is enough to reassure the
-// officer nothing has frozen.
-document.getElementById('batch-form').addEventListener('submit', function () {
-  const btn = document.getElementById('batch-submit-btn');
-  const progress = document.getElementById('batch-progress');
-  const fileCount = document.getElementById('batch-images').files.length;
-
-  progress.classList.remove('d-none');
-  document.getElementById('batch-progress-bar').textContent = `Processing ${fileCount} image(s), please wait...`;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
-});
-</script>
+<!-- batch.js contains batch upload progress handling; loaded in base.html -->
 {% endblock %}
