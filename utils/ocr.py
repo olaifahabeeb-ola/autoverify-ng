@@ -28,8 +28,10 @@ of the app keeps working during setup.
 
 import base64
 import logging
+import os
 import re
 import shutil
+import urllib.request
 
 import numpy as np
 import cv2
@@ -37,11 +39,98 @@ from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger("autoverify.ocr")
 
+_TESSERACT_PATH = None
+_TESSERACT_OK = False
+
+
+def _ensure_tessdata_language_file():
+    """Ensure a usable eng.traineddata file exists for Tesseract."""
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    project_tessdata_dir = os.path.join(project_root, "tessdata")
+    os.makedirs(project_tessdata_dir, exist_ok=True)
+
+    candidate_dirs = []
+    if os.environ.get("TESSDATA_PREFIX"):
+        candidate_dirs.append(os.environ["TESSDATA_PREFIX"])
+    candidate_dirs.append(project_tessdata_dir)
+
+    for exe_path in [
+        shutil.which("tesseract"),
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    ]:
+        if exe_path and os.path.exists(exe_path):
+            candidate_dirs.append(os.path.join(os.path.dirname(exe_path), "tessdata"))
+            candidate_dirs.append(os.path.join(os.path.dirname(exe_path), "..", "share", "tessdata"))
+            os.environ["PATH"] = os.path.dirname(exe_path) + os.pathsep + os.environ.get("PATH", "")
+
+    seen = set()
+    for directory in candidate_dirs:
+        if not directory:
+            continue
+        abs_dir = os.path.abspath(directory)
+        if abs_dir in seen:
+            continue
+        seen.add(abs_dir)
+        eng_path = os.path.join(abs_dir, "eng.traineddata")
+        if os.path.exists(eng_path):
+            os.environ["TESSDATA_PREFIX"] = abs_dir
+            return abs_dir
+
+    eng_path = os.path.join(project_tessdata_dir, "eng.traineddata")
+    if not os.path.exists(eng_path):
+        url = "https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata"
+        try:
+            logger.warning("No eng.traineddata found; downloading Tesseract English language data to %s", project_tessdata_dir)
+            urllib.request.urlretrieve(url, eng_path)
+        except Exception as exc:
+            logger.warning("Could not download eng.traineddata: %s", exc)
+
+    if os.path.exists(eng_path):
+        os.environ["TESSDATA_PREFIX"] = project_tessdata_dir
+        return project_tessdata_dir
+
+    return None
+
+
 try:
     import pytesseract
-    _TESSERACT_OK = shutil.which("tesseract") is not None
-    if not _TESSERACT_OK:
+
+    _ensure_tessdata_language_file()
+    _TESSERACT_PATH = shutil.which("tesseract")
+    if not _TESSERACT_PATH:
+        windows_candidates = [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        ]
+        for exe in windows_candidates:
+            if os.path.exists(exe):
+                _TESSERACT_PATH = exe
+                os.environ["PATH"] = os.path.dirname(exe) + os.pathsep + os.environ.get("PATH", "")
+                break
+    if _TESSERACT_PATH:
+        pytesseract.pytesseract.tesseract_cmd = _TESSERACT_PATH
+
+    default_tessdata = os.environ.get("TESSDATA_PREFIX", "")
+    has_eng_data = bool(default_tessdata) and os.path.exists(os.path.join(default_tessdata, "eng.traineddata"))
+    if not has_eng_data and _TESSERACT_PATH:
+        default_tessdata = os.path.join(os.path.dirname(_TESSERACT_PATH), "tessdata")
+        has_eng_data = os.path.exists(os.path.join(default_tessdata, "eng.traineddata"))
+        if has_eng_data:
+            os.environ["TESSDATA_PREFIX"] = os.path.dirname(default_tessdata)
+
+    _TESSERACT_OK = bool(_TESSERACT_PATH) and has_eng_data
+    if not _TESSERACT_PATH:
         logger.warning("Tesseract binary not found on PATH — OCR will use fallback mode.")
+    elif not has_eng_data:
+        logger.warning(
+            "Tesseract binary found, but no eng.traineddata language file is available. "
+            "OCR will use fallback mode until the language data is installed. "
+            "TESSDATA_PREFIX=%s",
+            os.environ.get("TESSDATA_PREFIX"),
+        )
+    else:
+        logger.info("Tesseract OCR is ready with language data installed at %s.", os.environ.get("TESSDATA_PREFIX"))
 except ImportError:
     _TESSERACT_OK = False
     logger.warning("pytesseract not installed — OCR will use fallback mode.")

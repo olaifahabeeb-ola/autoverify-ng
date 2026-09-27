@@ -108,6 +108,19 @@ class TestCameraCapture:
         detections = locate_and_read_plates(image, max_results=5)
         assert detections == []
 
+    def test_unreadable_camera_photo_returns_clear_error_message(self, officer_client):
+        img = np.full((400, 600, 3), 200, dtype=np.uint8)
+        ok, buf = cv2.imencode(".png", img)
+        assert ok
+        image = "data:image/png;base64," + base64.b64encode(buf).decode()
+
+        resp = officer_client.post("/verify", data={"image_data": image, "gps_lat": "9.05", "gps_lon": "7.49"})
+        assert resp.status_code == 200
+        assert b"No readable plate found" in resp.data
+        assert b"retake the photo" in resp.data
+        assert b"UNREGISTERED VEHICLE" not in resp.data
+        assert b"Mismatch Detected" not in resp.data
+
     def test_real_photo_ocr_reads_plate_correctly(self, officer_client):
         image = _make_plate_image("ABC-123-XY")
         resp = officer_client.post("/verify", data={"image_data": image, "gps_lat": "9.05", "gps_lon": "7.49"})

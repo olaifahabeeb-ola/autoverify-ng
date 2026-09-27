@@ -85,6 +85,16 @@ db.init_app(app)
 # ephemeral local SQLite file that gets wiped on every restart anyway).
 migrate = Migrate(app, db)
 
+# Diagnostic: surface Tesseract / OCR status at startup for easier debugging
+try:
+    from utils import ocr as _ocr_module
+    ocr_path = getattr(_ocr_module, "_TESSERACT_PATH", None)
+    tessdata = os.environ.get("TESSDATA_PREFIX")
+    app.logger.info("OCR startup: TESSERACT_PATH=%s, TESSDATA_PREFIX=%s, is_ocr_available=%s",
+                    ocr_path, tessdata, _ocr_module.is_ocr_available())
+except Exception:
+    app.logger.warning("OCR startup diagnostics failed to read utils.ocr module.")
+
 mail = None
 if app.config["MAIL_ENABLED"]:
     try:
