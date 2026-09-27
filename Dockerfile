@@ -28,11 +28,6 @@ ENV FLASK_APP=app.py
 # --timeout 120: the first request after a cold start loads TensorFlow/
 # OpenCV, which can take longer than gunicorn's 30s default timeout.
 #
-# `flask db stamp head` marks the existing schema as already at the latest
-# migration state when the database was initialized earlier (for example,
-# by a previous run of db.create_all() or a manual setup). This avoids the
-# duplicate-table error on Postgres while still letting `flask db upgrade`
-# apply only true pending migration changes. `flask seed-demo` then ensures
-# the demo officer/admin/vehicle records exist (idempotent — safe on
-# every deploy, won't duplicate on restart).
-CMD sh -c "python -c 'from app import app, db; app.app_context().push(); db.create_all()' && flask seed-demo && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
+# Run Alembic migrations on startup so a fresh Postgres database gets the
+# correct schema. Then seed demo data (idempotent) and start gunicorn.
+CMD sh -c "flask db upgrade && flask seed-demo && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
