@@ -36,8 +36,11 @@
       </div>
       <div class="col-md-6">
         <label class="form-label">Vehicle Photo</label>
-        <input type="file" name="photo" class="form-control" accept="image/*" required>
-        <div class="form-text">Optional — helps officers confirm identity at a glance.</div>
+        <input type="file" name="photo" id="photo-input" class="form-control" accept="image/*" required>
+        <div class="form-text">Required — used to auto-detect make/model/colour and shown to officers during verification.</div>
+        <div class="mt-2">
+          <img id="photo-preview" src="" alt="Preview" class="img-fluid rounded d-none" style="max-height:200px;" />
+        </div>
       </div>
     </div>
 
@@ -75,4 +78,20 @@
   <p class="text-center mt-3 mb-0">Already registered? <a href="{{ url_for('login') }}">Log in here</a></p>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('photo-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  const preview = document.getElementById('photo-preview');
+  if (!file) { preview.src = ''; preview.classList.add('d-none'); return; }
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    preview.src = ev.target.result;
+    preview.classList.remove('d-none');
+  };
+  reader.readAsDataURL(file);
+});
+</script>
 {% endblock %}

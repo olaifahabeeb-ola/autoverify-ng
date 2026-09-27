@@ -618,7 +618,7 @@ def register():
         photo = request.files.get("photo")
 
         if not all([plate_number, owner_name, owner_phone, owner_email,
-                    password, make, model, year, colour]):
+                password, year]):
             flash("Please fill in all required fields.", "danger")
             return redirect(url_for("register"))
 
@@ -652,16 +652,37 @@ def register():
             return redirect(url_for("register"))
 
         image_path = save_uploaded_image(photo)
+        if not image_path:
+            app.logger.warning("Uploaded registration photo failed to save or was invalid.")
+            flash("Could not save the uploaded vehicle photo. Please try again with a different image.", "danger")
+            return redirect(url_for("register"))
+
+        # If owner left make/model/colour blank or provided placeholders,
+        # attempt to auto-detect from the uploaded photo using the
+        # recognition pipeline. This helps prevent incorrect manual
+        # entries and improves registration data quality.
+        detected = None
+        try:
+            if image_path:
+                # pass the filesystem path to recognize_vehicle
+                detected = recognize_vehicle(os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(image_path)))
+        except Exception as exc:
+            app.logger.warning("Recognition on registration photo failed: %s", exc)
+
+        # Prefer owner-supplied fields when provided; otherwise use detected
+        final_make = make or (detected.get('make') if detected else None) or ''
+        final_model = model or (detected.get('model') if detected else None) or ''
+        final_colour = colour or (detected.get('colour') if detected else None) or ''
 
         vehicle = Vehicle(
             plate_number=plate_number,
             owner_name=owner_name,
             owner_phone=owner_phone,
             owner_email=owner_email,
-            make=make,
-            model=model,
+            make=final_make,
+            model=final_model,
             year=year_int,
-            colour=colour,
+            colour=final_colour,
             image_path=image_path,
         )
         vehicle.set_password(password)
