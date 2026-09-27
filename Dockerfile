@@ -35,3 +35,4 @@ ENV FLASK_APP=app.py
 # apply only true pending migration changes. `flask seed-demo` then ensures
 # the demo officer/admin/vehicle records exist (idempotent — safe on
 # every deploy, won't duplicate on restart).
+CMD sh -c "python -c 'from app import app, db; app.app_context().push(); db.create_all()' && flask seed-demo && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
