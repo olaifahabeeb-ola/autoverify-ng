@@ -91,3 +91,38 @@ class TestHotlist:
             follow_redirects=True,
         )
         assert b"No vehicle found" in resp.data
+
+
+def test_owner_can_cancel_own_report(owner_client, app):
+    # Owner files a stolen report, then cancels it via the new endpoint.
+    owner_client.post("/owner/report", data={"report_type": "stolen", "description": "test cancel"})
+
+    with app.app_context():
+        from models import OwnerReport
+        report = OwnerReport.query.filter_by(report_type="stolen", is_active=True).first()
+        assert report is not None
+        report_id = report.id
+
+    resp = owner_client.post(f"/owner/report/cancel/{report_id}", follow_redirects=True)
+    assert b"cancelled" in resp.data or b"marked as resolved" in resp.data
+
+    with app.app_context():
+        from models import OwnerReport, db
+        resolved = db.session.get(OwnerReport, report_id)
+        assert resolved.is_active is False
+        assert resolved.resolved_at is not None
+
+
+def test_non_owner_cannot_cancel_report(client, owner_client, app):
+    # Create a report as owner
+    owner_client.post("/owner/report", data={"report_type": "stolen", "description": "test non-owner cancel"})
+
+    with app.app_context():
+        from models import OwnerReport
+        report = OwnerReport.query.filter_by(report_type="stolen", is_active=True).first()
+        assert report is not None
+        report_id = report.id
+
+    # anonymous client (not logged in as owner) attempts to cancel
+    resp = client.post(f"/owner/report/cancel/{report_id}", follow_redirects=True)
+    assert b"Please log in" in resp.data or b"not authorized" in resp.data

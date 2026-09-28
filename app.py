@@ -770,6 +770,35 @@ def owner_report():
     return redirect(url_for("owner_dashboard"))
 
 
+@app.route("/owner/report/cancel/<int:report_id>", methods=["POST"])
+@owner_login_required
+def owner_cancel_report(report_id):
+    """Allow a vehicle owner to cancel their own active report (e.g. they
+    found their vehicle and want to mark a stolen report as resolved).
+    Only the owner who filed the report (matching session vehicle_id) may
+    cancel it. This sets `is_active=False` and records `resolved_at`.
+    """
+    report = db.session.get(OwnerReport, report_id)
+    if not report:
+        flash("Report not found.", "danger")
+        return redirect(url_for("owner_dashboard"))
+
+    if report.vehicle_id != session.get("vehicle_id"):
+        flash("You are not authorized to cancel this report.", "danger")
+        return redirect(url_for("owner_dashboard"))
+
+    if not report.is_active:
+        flash("This report is already resolved.", "info")
+        return redirect(url_for("owner_dashboard"))
+
+    report.is_active = False
+    report.resolved_at = utcnow()
+    db.session.commit()
+
+    flash("Your report has been cancelled and marked as resolved.", "success")
+    return redirect(url_for("owner_dashboard"))
+
+
 # ------------------------------------------------------------------
 # Officer: Login
 # ------------------------------------------------------------------
@@ -847,33 +876,16 @@ def verify_post():
 
     vehicles_results = []
 
+    # If a real image is present, try to read plates from it first. Only
+    # fall back to a manually-typed plate when the camera image produced
+    # no readable plate (camera failure). This preserves camera-priority
+    # in normal cases while allowing officers to manually enter a plate
+    # after a failed capture without having to re-open the manual input UI.
     if has_real_image:
-        # Camera capture is the authoritative officer input. When a real
-        # image is present, ignore any manually typed plate value so the OCR
-        # / detection result drives the scan.
         detections = locate_and_read_plates(image_data_url, max_results=MAX_BATCH_IMAGES)
-        if not detections:
-            vehicles_results.append({
-                "plate_number": None,
-                "recognized_make": None,
-                "recognized_model": None,
-                "recognized_colour": None,
-                "recognition_method": None,
-                "visually_verified": False,
-                "status": "error",
-                "message": "No readable plate found in the captured image. Please retake the photo in better light and from a clearer angle.",
-                "notes": [
-                    "ℹ️ The camera image did not produce a reliable plate read. No random or assumed plate number was inserted.",
-                    "ℹ️ Try a sharper, front-facing, well-lit shot of the registration plate."
-                ],
-                "owner_info": None,
-                "registered_vehicle": None,
-                "trigger_alert": False,
-                "alert_type": None,
-                "registered_image_path": None,
-                "owner_notified": False,
-            })
-        else:
+        if detections:
+            # Camera produced one or more plate reads — use these results
+            # and ignore any conflicting manual_plate values (camera wins).
             for det in detections:
                 recognized = recognize_vehicle(image_data_url, bbox=det.get("bbox"))
                 vehicles_results.append(
@@ -881,10 +893,42 @@ def verify_post():
                         det["plate_number"], recognized, session["officer_id"], gps_lat, gps_lon
                     )
                 )
+        else:
+            # No plate was readable from the camera image. If the officer
+            # supplied a manual plate, use it and still attempt a visual
+            # recognition pass on the image (whole-frame) so appearance can
+            # be compared when possible.
+            if manual_plate:
+                try:
+                    recognized = recognize_vehicle(image_data_url)
+                except Exception:
+                    recognized = {"make": None, "model": None, "colour": None, "method": "no_image"}
+                vehicles_results.append(
+                    build_and_persist_scan_result(manual_plate, recognized, session["officer_id"], gps_lat, gps_lon)
+                )
+            else:
+                vehicles_results.append({
+                    "plate_number": None,
+                    "recognized_make": None,
+                    "recognized_model": None,
+                    "recognized_colour": None,
+                    "recognition_method": None,
+                    "visually_verified": False,
+                    "status": "error",
+                    "message": "No readable plate found in the captured image. Please retake the photo in better light and from a clearer angle.",
+                    "notes": [
+                        "ℹ️ The camera image did not produce a reliable plate read. No random or assumed plate number was inserted.",
+                        "ℹ️ Try a sharper, front-facing, well-lit shot of the registration plate."
+                    ],
+                    "owner_info": None,
+                    "registered_vehicle": None,
+                    "trigger_alert": False,
+                    "alert_type": None,
+                    "registered_image_path": None,
+                    "owner_notified": False,
+                })
     elif manual_plate:
-        # Officer typed the plate manually only when no camera photo was
-        # captured at all. In that case there is no real image to inspect, so
-        # we intentionally skip recognition rather than guessing attributes.
+        # No image captured at all — manual plate entry is the sole input.
         recognized = {"make": None, "model": None, "colour": None, "method": "no_image"}
         vehicles_results.append(
             build_and_persist_scan_result(manual_plate, recognized, session["officer_id"], gps_lat, gps_lon)

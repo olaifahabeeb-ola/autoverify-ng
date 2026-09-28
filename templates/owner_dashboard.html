@@ -73,6 +73,9 @@
                 <td>
                   {% if r.is_active %}
                     <span class="badge bg-warning text-dark">Active</span>
+                    <form method="POST" action="{{ url_for('owner_cancel_report', report_id=r.id) }}" class="d-inline ms-2">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Cancel</button>
+                    </form>
                   {% else %}
                     <span class="badge bg-success">Resolved</span>
                   {% endif %}
