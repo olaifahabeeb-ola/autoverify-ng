@@ -8,9 +8,11 @@ services:
     plan: free
     repo: <replace-with-your-github-ssh-or-https-repo-url>
     buildCommand: ''
-    startCommand: ''
+    startCommand: 'flask db upgrade && flask seed-demo && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120'
     envVars:
       - key: SECRET_KEY
         value: "REPLACE_WITH_RANDOM_SECRET"
       - key: FLASK_DEBUG
         value: "0"
+      - key: DATABASE_URL
+        value: "REPLACE_WITH_DATABASE_URL_OR_LEAVE_EMPTY"
