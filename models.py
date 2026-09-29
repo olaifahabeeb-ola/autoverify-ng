@@ -93,6 +93,13 @@ class ScanLog(db.Model):
     mismatch_detail = db.Column(db.Text, nullable=True)
     report_flag = db.Column(db.Boolean, default=False)
     stolen_flag = db.Column(db.Boolean, default=False)
+    # CORRECTION 2 (HND project): records whether the compared attributes
+    # came from the CNN camera scan or officer manual entry, so the scan
+    # result page and admin analytics can show "Attributes verified by:
+    # Camera (AI)" vs "Officer (manual)". Default "camera" keeps every
+    # existing row (all scanned before this field existed) valid without
+    # a backfill migration.
+    attribution_source = db.Column(db.String(20), nullable=False, default="camera", server_default="camera")
     gps_lat = db.Column(db.Float, nullable=True)
     gps_lon = db.Column(db.Float, nullable=True)
     timestamp = db.Column(db.DateTime, default=utcnow)
