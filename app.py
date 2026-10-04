@@ -20,7 +20,7 @@ from utils.recognition import recognize_vehicle, is_classifier_loaded
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "jfif"}
 ALERTS_LOG_PATH = os.path.join(BASE_DIR, "alerts.log")
 NOTIFICATIONS_LOG_PATH = os.path.join(BASE_DIR, "owner_notifications.log")
 DB_PATH = os.path.join(BASE_DIR, "autoverify.db")
@@ -350,6 +350,15 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
     case we skip attribute comparison entirely rather than comparing
     against a fabricated guess, which would otherwise risk a false
     MISMATCH alert on a plate that was never actually looked at.
+
+    CORRECTION 2 (HND project): `recognized["method"]` may also be
+    "manual" — this means the officer typed the plate AND selected
+    make/model/colour from dropdowns after a failed camera read. In that
+    case `visually_verified` is True and the full mismatch comparison
+    runs exactly as it would for a camera-based scan, just sourced from
+    officer observation instead of the CNN. `attribution_source` on the
+    resulting ScanLog records which path produced the attributes:
+    "camera" | "manual" | "none".
     """
     if not plate_number:
         return {
@@ -372,7 +381,7 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
 
     recognized = recognized or {"make": None, "model": None, "colour": None, "method": "no_image"}
     vehicle = Vehicle.query.filter_by(plate_number=plate_number).first()
-    visually_verified = recognized.get("method") != "no_image"
+    visually_verified = recognized.get("method") not in ("no_image", "untrained")
 
     result = {
         "plate_number": plate_number,
@@ -461,7 +470,7 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
             report_flag = True
             result["notes"].append("ℹ️ REPORT ACTIVE: Vehicle has been marked as written off / scrapped by owner.")
 
-        # Registered vehicle photo + details — shown to officers so they can
+         # Registered vehicle photo + details — shown to officers so they can
         # visually compare against the real vehicle in front of them. This
         # matters most for manual/no-photo checks, where no AI comparison
         # runs at all (see build_and_persist_scan_result's no_image branch).
@@ -482,6 +491,14 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
             "address_note": "Full address available in admin records.",
         }
 
+    method = recognized.get("method")
+    if method == "manual":
+        attribution_source = "manual"
+    elif method in ("no_image", "untrained"):
+        attribution_source = "none"
+    else:
+        attribution_source = "camera"
+
     scan = ScanLog(
         officer_id=officer_id,
         plate_number=plate_number,
@@ -493,12 +510,14 @@ def build_and_persist_scan_result(plate_number, recognized, officer_id, gps_lat=
         mismatch_detail=mismatch_detail,
         report_flag=report_flag,
         stolen_flag=stolen_flag,
+        attribution_source=attribution_source,
         gps_lat=float(gps_lat) if gps_lat else None,
         gps_lon=float(gps_lon) if gps_lon else None,
     )
     db.session.add(scan)
     db.session.commit()
     result["scan_id"] = scan.id
+    result["attribution_source"] = attribution_source
 
     if result["trigger_alert"]:
         officer = db.session.get(Officer, officer_id)
@@ -540,7 +559,21 @@ def index():
     if session.get("officer_id"):
         if session.get("is_admin"):
             return redirect(url_for("admin"))
-        return redirect(url_for("verify"))
+        # CORRECTION 1 (HND project): officers now land on a dashboard
+        # that leads with recognition/mismatch statistics, instead of
+        # skipping straight to the scan page.
+        today = date.today()
+        today_scans = ScanLog.query.filter(db.func.date(ScanLog.timestamp) == today).all()
+        context = {
+            "total_vehicles": Vehicle.query.count(),
+            "scans_today": len(today_scans),
+            "active_stolen": OwnerReport.query.filter_by(report_type="stolen", is_active=True).count(),
+            "mismatches_today": sum(1 for s in today_scans if not s.matched and not s.stolen_flag),
+            "clear_today": sum(1 for s in today_scans if s.matched and not s.stolen_flag),
+            "stolen_today": sum(1 for s in today_scans if s.stolen_flag),
+            "recent_scans": ScanLog.query.order_by(ScanLog.timestamp.desc()).limit(10).all(),
+        }
+        return render_template("index.html", **context)
 
     return render_template("index.html")
 
@@ -656,24 +689,24 @@ def register():
             app.logger.warning("Uploaded registration photo failed to save or was invalid.")
             flash("Could not save the uploaded vehicle photo. Please try again with a different image.", "danger")
             return redirect(url_for("register"))
-
-        # If owner left make/model/colour blank or provided placeholders,
-        # attempt to auto-detect from the uploaded photo using the
-        # recognition pipeline. This helps prevent incorrect manual
-        # entries and improves registration data quality.
+        # Auto-detect vehicle attributes from the uploaded photo.
+        # Colour detection (OpenCV k-means) works on ANY vehicle photo
+        # regardless of make/model, so it is more reliable than manual
+        # typing (avoids typos like "sliver" vs "silver") and is
+        # preferred over the owner's typed value when detection succeeds.
+        # Make/model detection only works for classes the CNN was
+        # trained on, so those still prefer the owner's typed value.
         detected = None
         try:
             if image_path:
-                # pass the filesystem path to recognize_vehicle
                 detected = recognize_vehicle(os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(image_path)))
         except Exception as exc:
             app.logger.warning("Recognition on registration photo failed: %s", exc)
 
-        # Prefer owner-supplied fields when provided; otherwise use detected
         final_make = make or (detected.get('make') if detected else None) or ''
         final_model = model or (detected.get('model') if detected else None) or ''
-        final_colour = colour or (detected.get('colour') if detected else None) or ''
-
+        detected_colour = detected.get('colour') if detected else None
+        final_colour = detected_colour or colour or ''
         vehicle = Vehicle(
             plate_number=plate_number,
             owner_name=owner_name,
@@ -868,6 +901,29 @@ def verify_post():
     gps_lon = request.form.get("gps_lon") or request.form.get("manual_gps_lon")
     manual_plate = request.form.get("manual_plate", "").strip().upper()
 
+    # CORRECTION 2 (HND project): when OCR/camera fails to read a plate,
+    # the officer must also select the vehicle's make/model/colour from
+    # dropdowns so the mismatch comparison still runs (they are standing
+    # in front of the vehicle and can see these attributes directly).
+    # These are only used when a manual plate is being processed; if any
+    # of the three is left blank we fall back to the original "no_image"
+    # behaviour (plate-only check, no mismatch comparison) rather than
+    # forcing a hard failure.
+    manual_make = request.form.get("manual_make", "").strip()
+    if manual_make == "__other__":
+        manual_make = request.form.get("manual_make_other", "").strip()
+    manual_model = request.form.get("manual_model", "").strip()
+    if manual_model == "__other__":
+        manual_model = request.form.get("manual_model_other", "").strip()
+    manual_colour = request.form.get("manual_colour", "").strip()
+    if manual_colour == "__other__":
+        manual_colour = request.form.get("manual_colour_other", "").strip()
+
+    def _build_manual_recognized():
+        if manual_make and manual_model and manual_colour:
+            return {"make": manual_make, "model": manual_model, "colour": manual_colour, "method": "manual"}
+        return {"make": None, "model": None, "colour": None, "method": "no_image"}
+
     # A real captured frame is always a "data:image/..." data URL. Anything
     # else (empty string, missing field) means no photo was actually taken.
     has_real_image = bool(image_data_url) and image_data_url.startswith("data:image")
@@ -895,14 +951,18 @@ def verify_post():
                 )
         else:
             # No plate was readable from the camera image. If the officer
-            # supplied a manual plate, use it and still attempt a visual
-            # recognition pass on the image (whole-frame) so appearance can
-            # be compared when possible.
+            # supplied a manual plate, prefer officer-selected make/model/
+            # colour (CORRECTION 2) when provided, since that is a direct
+            # observation rather than a guess; otherwise fall back to a
+            # whole-frame CNN attempt as before.
             if manual_plate:
-                try:
-                    recognized = recognize_vehicle(image_data_url)
-                except Exception:
-                    recognized = {"make": None, "model": None, "colour": None, "method": "no_image"}
+                if manual_make and manual_model and manual_colour:
+                    recognized = _build_manual_recognized()
+                else:
+                    try:
+                        recognized = recognize_vehicle(image_data_url)
+                    except Exception:
+                        recognized = {"make": None, "model": None, "colour": None, "method": "no_image"}
                 vehicles_results.append(
                     build_and_persist_scan_result(manual_plate, recognized, session["officer_id"], gps_lat, gps_lon)
                 )
@@ -929,7 +989,9 @@ def verify_post():
                 })
     elif manual_plate:
         # No image captured at all — manual plate entry is the sole input.
-        recognized = {"make": None, "model": None, "colour": None, "method": "no_image"}
+        # CORRECTION 2: use officer-selected make/model/colour when given,
+        # so the mismatch comparison runs on this path too.
+        recognized = _build_manual_recognized()
         vehicles_results.append(
             build_and_persist_scan_result(manual_plate, recognized, session["officer_id"], gps_lat, gps_lon)
         )
@@ -1005,6 +1067,10 @@ def admin():
     scan_logs = ScanLog.query.order_by(ScanLog.timestamp.desc()).limit(50).all()
     owner_notifications = OwnerNotification.query.order_by(OwnerNotification.created_at.desc()).limit(50).all()
     batch_uploads = BatchUpload.query.order_by(BatchUpload.created_at.desc()).limit(50).all()
+    # CORRECTION 1 (HND project): mismatch count surfaced on the main
+    # admin panel too, not just the dedicated analytics page — mismatch
+    # detection is this project's headline topic.
+    total_mismatches = ScanLog.query.filter_by(matched=False).count()
     return render_template(
         "admin.html",
         officers=officers,
@@ -1013,6 +1079,7 @@ def admin():
         scan_logs=scan_logs,
         owner_notifications=owner_notifications,
         batch_uploads=batch_uploads,
+        total_mismatches=total_mismatches,
     )
 
 
@@ -1283,6 +1350,16 @@ def api_analytics_stats():
     officer_performance = sorted(officer_stats.values(), key=lambda row: row["total_scans"], reverse=True)
     officer_activity = [{"officer": row["officer"], "count": row["total_scans"]} for row in officer_performance]
 
+    # CORRECTION 1 (HND project): camera-vs-manual attribution split, so
+    # the admin analytics page can show how many scans were verified by
+    # the CNN versus officer manual entry.
+    source_counts = {"camera": 0, "manual": 0, "none": 0}
+    for s in officer_scans:
+        src = getattr(s, "attribution_source", None) or "none"
+        if src not in source_counts:
+            source_counts[src] = 0
+        source_counts[src] += 1
+
     # PHASE 4: summary stats + recent scans table for the PDF export
     summary = {
         "total_scans": len(officer_scans),
@@ -1301,6 +1378,7 @@ def api_analytics_stats():
         "plate_number": s.plate_number,
         "officer": s.officer.full_name if s.officer else "Unknown",
         "status": "stolen" if s.stolen_flag else ("mismatch" if not s.matched else "clear"),
+        "attribution_source": getattr(s, "attribution_source", None) or "none",
     } for s in recent_scans_qs]
 
     return jsonify({
@@ -1311,6 +1389,7 @@ def api_analytics_stats():
         "recovered_over_time": recovered_over_time,
         "officer_activity": officer_activity,
         "officer_performance": officer_performance,
+        "attribution_source_counts": source_counts,
         "summary": summary,
         "recent_scans": recent_scans,
     })

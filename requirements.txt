@@ -22,6 +22,8 @@ Pillow>=10.4.0
 # tensorflow-cpu works on any laptop (no GPU required).
 tensorflow-cpu==2.21.0
 
+scipy>=1.13
+
 # Optional: only needed if you set MAIL_ENABLED=True in app.py for real
 # email alerts instead of the default console/alerts.log simulation.
 # Flask-Mail==0.10.0

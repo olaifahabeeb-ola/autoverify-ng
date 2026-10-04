@@ -16,10 +16,11 @@ owner_notifications.log
 static/uploads/*
 !static/uploads/.gitkeep
 
-# Trained model (only present after running utils/train_classifier.py)
-models_ml/*.h5
-models_ml/*.json
-!models_ml/.gitkeep
+# Large raw datasets used only for local training — not needed by the app itself
+stanford_cars_raw/
+archive_extracted/
+archive.zip
+stanford-car-dataset-by-classes-folder.zip
 
 # OS/editor cruft
 .DS_Store

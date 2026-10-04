@@ -4,15 +4,157 @@
 
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2 no-print">
   <h3 class="section-title mb-0"><i class="fa-solid fa-chart-line"></i> Admin Analytics</h3>
-  {% block scripts %}
-  <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.js') }}"></script>
-  <!-- analytics.js initialises charts and loads data -->
-  <script defer src="{{ url_for('static', filename='js/analytics.js') }}"></script>
-  {% endblock %}
+  <div class="d-flex flex-wrap gap-2 align-items-end">
+    <div>
+      <label class="form-label mb-1 small">Range</label>
+      <select id="range-select" class="form-select form-select-sm">
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div id="custom-range-fields" class="d-none d-flex gap-2">
+      <div>
+        <label class="form-label mb-1 small">Start</label>
+        <input type="date" id="range-start" class="form-control form-control-sm">
+      </div>
+      <div>
+        <label class="form-label mb-1 small">End</label>
+        <input type="date" id="range-end" class="form-control form-control-sm">
+      </div>
+    </div>
+    <button id="apply-range-btn" class="btn btn-av-primary btn-sm">Apply</button>
+  </div>
+</div>
+
+<p id="range-label" class="text-muted small mb-3"></p>
+
+<!-- CORRECTION 1 (HND project): mismatch detection is the project's headline
+     topic, so its summary card leads, with mismatches shown prominently
+     rather than buried after stolen-vehicle stats. -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card stat-ok">
+      <div class="stat-label">Total Scans</div>
+      <div class="stat-value" id="summary-total-scans">0</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card stat-warn">
+      <div class="stat-label">Mismatches</div>
+      <div class="stat-value" id="summary-total-mismatches">0</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card stat-danger">
+      <div class="stat-label">Stolen Flags</div>
+      <div class="stat-value" id="summary-total-stolen">0</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card stat-ok">
+      <div class="stat-label">Active Officers</div>
+      <div class="stat-value" id="summary-total-officers">0</div>
+    </div>
+  </div>
+</div>
+
+<!-- CORRECTION 2 (HND project): camera-vs-manual attribution split -->
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="stat-card stat-ok">
+      <div class="stat-label"><i class="fa-solid fa-robot"></i> Camera (AI) Scans</div>
+      <div class="stat-value" id="summary-source-camera">0</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-label"><i class="fa-solid fa-user-shield"></i> Manual Entry Scans</div>
+      <div class="stat-value" id="summary-source-manual">0</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-label">Plate-Only (No Attributes)</div>
+      <div class="stat-value" id="summary-source-none">0</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="av-card p-3">
+      <h6 class="text-muted text-uppercase small mb-2">Daily Scans</h6>
+      <canvas id="dailyScansChart" height="180"></canvas>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="av-card p-3">
+      <h6 class="text-muted text-uppercase small mb-2">Mismatches by Make</h6>
+      <canvas id="mismatchByMakeChart" height="180"></canvas>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="av-card p-3">
+      <h6 class="text-muted text-uppercase small mb-2">Recovered Stolen Vehicles Over Time</h6>
+      <canvas id="recoveredChart" height="180"></canvas>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="av-card p-3">
+      <h6 class="text-muted text-uppercase small mb-2">Officer Activity</h6>
+      <canvas id="officerActivityChart" height="180"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="av-card">
+      <div class="card-header">Officer Performance</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Officer</th><th>Scans</th><th>Mismatches</th><th>Stolen Recoveries</th></tr></thead>
+            <tbody id="officer-performance-body">
+              <tr><td colspan="4" class="text-center text-muted py-3">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="av-card">
+      <div class="card-header">Recent Scans</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Time</th><th>Plate</th><th>Officer</th><th>Status</th></tr></thead>
+            <tbody id="recent-scans-body">
+              <tr><td colspan="4" class="text-center text-muted py-3">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.js') }}"></script>
+<script>
+let dailyScansChart, mismatchByMakeChart, recoveredChart, officerActivityChart;
+
+document.getElementById('range-select').addEventListener('change', function () {
+  document.getElementById('custom-range-fields').classList.toggle('d-none', this.value !== 'custom');
+});
 document.getElementById('apply-range-btn').addEventListener('click', loadAnalytics);
 
 function buildQuery() {
-  const range = rangeSelect.value;
+  const range = document.getElementById('range-select').value;
   if (range === 'custom') {
     const start = document.getElementById('range-start').value;
     const end = document.getElementById('range-end').value;
@@ -29,6 +171,7 @@ function loadAnalytics() {
         `Showing ${data.start_date} to ${data.end_date}`;
       renderCharts(data);
       renderSummary(data.summary);
+      renderSourceCounts(data.attribution_source_counts);
       renderOfficerPerformance(data.officer_performance);
       renderRecentScans(data.recent_scans);
     })
@@ -40,6 +183,13 @@ function renderSummary(summary) {
   document.getElementById('summary-total-mismatches').textContent = summary.total_mismatches;
   document.getElementById('summary-total-stolen').textContent = summary.total_stolen;
   document.getElementById('summary-total-officers').textContent = summary.total_officers;
+}
+
+function renderSourceCounts(counts) {
+  if (!counts) return;
+  document.getElementById('summary-source-camera').textContent = counts.camera || 0;
+  document.getElementById('summary-source-manual').textContent = counts.manual || 0;
+  document.getElementById('summary-source-none').textContent = counts.none || 0;
 }
 
 function renderOfficerPerformance(rows) {
@@ -80,7 +230,6 @@ function renderRecentScans(rows) {
 }
 
 function renderCharts(data) {
-  // Daily scans (bar)
   if (dailyScansChart) dailyScansChart.destroy();
   dailyScansChart = new Chart(document.getElementById('dailyScansChart'), {
     type: 'bar',
@@ -91,7 +240,6 @@ function renderCharts(data) {
     options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
   });
 
-  // Mismatches by make (horizontal bar)
   if (mismatchByMakeChart) mismatchByMakeChart.destroy();
   mismatchByMakeChart = new Chart(document.getElementById('mismatchByMakeChart'), {
     type: 'bar',
@@ -106,7 +254,6 @@ function renderCharts(data) {
     }
   });
 
-  // Recovered stolen vehicles over time (line)
   if (recoveredChart) recoveredChart.destroy();
   recoveredChart = new Chart(document.getElementById('recoveredChart'), {
     type: 'line',
@@ -124,7 +271,6 @@ function renderCharts(data) {
     options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
   });
 
-  // Officer activity (bar)
   if (officerActivityChart) officerActivityChart.destroy();
   officerActivityChart = new Chart(document.getElementById('officerActivityChart'), {
     type: 'bar',

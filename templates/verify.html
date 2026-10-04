@@ -45,13 +45,85 @@
         <summary class="text-muted small summary-cursor-pointer">
           <i class="fa-solid fa-keyboard"></i> Plate not reading clearly? Enter it manually
         </summary>
-        <form id="manual-form" method="POST" class="mt-3 d-flex gap-2 justify-content-center flex-wrap">
+        <form id="manual-form" method="POST" class="mt-3">
           <input type="hidden" name="image_data" id="manual_image_data">
           <input type="hidden" name="gps_lat" id="manual_gps_lat">
           <input type="hidden" name="gps_lon" id="manual_gps_lon">
-          <input type="text" name="manual_plate" class="form-control max-width-220" required
-                 placeholder="e.g. ABC-123-XY" pattern="[A-Za-z]{3}-?\d{3}-?[A-Za-z]{2}">
-          <button type="submit" class="btn btn-av-outline">Verify Manually</button>
+
+          <div class="d-flex gap-2 justify-content-center flex-wrap mb-3">
+            <input type="text" name="manual_plate" class="form-control max-width-220" required
+                   placeholder="e.g. ABC-123-XY" pattern="[A-Za-z]{3}-?\d{3}-?[A-Za-z]{2}">
+          </div>
+
+          <!-- CORRECTION 2 (HND project): the officer is standing in front of
+               the vehicle, so when the camera/OCR can't read the plate they
+               can see these attributes directly. Selecting all three lets the
+               same mismatch comparison used for camera scans run on manual
+               entries too, instead of skipping recognition entirely. -->
+          <p class="text-muted small mb-2">
+            <i class="fa-solid fa-eye"></i> You can see the vehicle — select what you observe so it can still be checked for a plate-to-vehicle mismatch:
+          </p>
+          <div class="d-flex gap-2 justify-content-center flex-wrap mb-3">
+                        <select name="manual_make" id="manual_make" class="form-select max-width-220" aria-label="Observed make">
+              <option value="">Make (optional)</option>
+              <option value="Toyota">Toyota</option>
+              <option value="Honda">Honda</option>
+              <option value="Lexus">Lexus</option>
+              <option value="Mercedes-Benz">Mercedes-Benz</option>
+              <option value="BMW">BMW</option>
+              <option value="Kia">Kia</option>
+              <option value="Hyundai">Hyundai</option>
+              <option value="Nissan">Nissan</option>
+              <option value="Ford">Ford</option>
+              <option value="Peugeot">Peugeot</option>
+              <option value="Innoson">Innoson</option>
+              <option value="Volkswagen">Volkswagen</option>
+              <option value="__other__">Other (specify)</option>
+            </select>
+            <input type="text" name="manual_make_other" id="manual_make_other"
+                   class="form-control max-width-220 d-none" placeholder="Type make">
+
+            <select name="manual_model" id="manual_model" class="form-select max-width-220" aria-label="Observed model">
+              <option value="">Model (optional)</option>
+              <option value="Camry">Camry</option>
+              <option value="Corolla">Corolla</option>
+              <option value="Accord">Accord</option>
+              <option value="Civic">Civic</option>
+              <option value="RX 350">RX 350</option>
+              <option value="C-Class">C-Class</option>
+              <option value="3 Series">3 Series</option>
+              <option value="Rio">Rio</option>
+              <option value="Elantra">Elantra</option>
+              <option value="Altima">Altima</option>
+              <option value="__other__">Other (specify)</option>
+            </select>
+            <input type="text" name="manual_model_other" id="manual_model_other"
+                   class="form-control max-width-220 d-none" placeholder="Type model">
+
+            <select name="manual_colour" id="manual_colour" class="form-select max-width-220" aria-label="Observed colour">
+              <option value="">Colour (optional)</option>
+              <option value="White">White</option>
+              <option value="Black">Black</option>
+              <option value="Silver">Silver</option>
+              <option value="Grey">Grey</option>
+              <option value="Blue">Blue</option>
+              <option value="Red">Red</option>
+              <option value="Green">Green</option>
+              <option value="Gold">Gold</option>
+              <option value="Brown">Brown</option>
+              <option value="Wine">Wine</option>
+              <option value="__other__">Other (specify)</option>
+            </select>
+            <input type="text" name="manual_colour_other" id="manual_colour_other"
+                   class="form-control max-width-220 d-none" placeholder="Type colour">
+          </div>
+          <p class="text-muted small mb-3">
+            <i class="fa-solid fa-circle-info"></i> Leave these blank for a plate-only check with no mismatch comparison. Fill in all three for a full check.
+          </p>
+
+          <div class="d-flex justify-content-center">
+            <button type="submit" class="btn btn-av-outline">Verify Manually</button>
+          </div>
         </form>
       </details>
     </div>
@@ -69,6 +141,29 @@
       <div class="vehicle-result-list" id="vehicle-result-list">
         {% for v in vehicles %}
         <div class="verify-result status-{{ v.status }} mb-3" data-status="{{ v.status }}" data-message="{{ v.message }}">
+
+          <!-- CORRECTION 1 (HND project): MISMATCH is the headline verdict
+               this project is graded on, so it gets its own prominent
+               orange/red banner — distinct from and separate to the STOLEN
+               banner, rather than sharing a small badge with every other
+               status. -->
+          {% if v.status == 'mismatch' %}
+          <div class="verdict-banner verdict-banner-mismatch mb-3">
+            <i class="fa-solid fa-triangle-exclamation fa-2x"></i>
+            <div>
+              <div class="verdict-banner-title">PLATE-TO-VEHICLE MISMATCH</div>
+              <div class="verdict-banner-subtitle">The vehicle does not match the registered plate.</div>
+            </div>
+          </div>
+          {% elif v.status == 'stolen' %}
+          <div class="verdict-banner verdict-banner-stolen mb-3">
+            <i class="fa-solid fa-circle-exclamation fa-2x"></i>
+            <div>
+              <div class="verdict-banner-title">STOLEN VEHICLE REPORTED</div>
+              <div class="verdict-banner-subtitle">Contact control room immediately.</div>
+            </div>
+          </div>
+          {% endif %}
 
           {% if v.registered_vehicle and v.registered_vehicle.image_path %}
           <div class="d-flex align-items-center gap-3 mb-3 pb-3" style="border-bottom: 1px solid var(--av-border);">
@@ -110,6 +205,22 @@
             {% endif %}
           </h5>
 
+          <!-- CORRECTION 2 (HND project): shows whether the compared
+               attributes came from the CNN camera scan or officer manual
+               entry, using the attribution_source now tracked on ScanLog. -->
+          {% if v.attribution_source %}
+          <p class="mb-2">
+            <span class="text-muted small text-uppercase fw-semibold">Attributes verified by:</span>
+            {% if v.attribution_source == 'camera' %}
+              <span class="badge badge-clear"><i class="fa-solid fa-robot"></i> Camera (AI)</span>
+            {% elif v.attribution_source == 'manual' %}
+              <span class="badge badge-unregistered"><i class="fa-solid fa-user-shield"></i> Officer (manual)</span>
+            {% else %}
+              <span class="badge badge-unregistered">Not verified (plate only)</span>
+            {% endif %}
+          </p>
+          {% endif %}
+
           <div class="row g-3 mt-2 mb-3">
             <div class="col-md-6">
               <h6 class="text-muted text-uppercase small mb-2">Registered Vehicle</h6>
@@ -128,10 +239,65 @@
                 <div class="comparison-empty">No captured image available</div>
               {% endif %}
             </div>
-            <div class="col-12">
-              <small class="text-muted">Compare the photos visually before proceeding.</small>
-            </div>
           </div>
+
+          <!-- CORRECTION 1 (HND project): attribute-by-attribute tick/cross
+               comparison — this table is the visual core of the project's
+               topic (plate-to-vehicle mismatch detection), so it is shown
+               whenever a registered vehicle exists and attributes were
+               actually compared (camera or manual), not just as a photo
+               side-by-side. -->
+          {% if v.registered_vehicle and v.visually_verified %}
+          <h6 class="text-muted text-uppercase small mb-2 mt-1">Attribute Comparison</h6>
+          <table class="table table-sm mb-3">
+            <thead>
+              <tr>
+                <th>Attribute</th>
+                <th>Registered</th>
+                <th>Observed</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Make</td>
+                <td>{{ v.registered_vehicle.make }}</td>
+                <td>{{ v.recognized_make }}</td>
+                <td>
+                  {% if v.recognized_make and v.recognized_make|lower == v.registered_vehicle.make|lower %}
+                    <i class="fa-solid fa-circle-check text-success"></i>
+                  {% else %}
+                    <i class="fa-solid fa-circle-xmark text-danger"></i>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td>Model</td>
+                <td>{{ v.registered_vehicle.model }}</td>
+                <td>{{ v.recognized_model }}</td>
+                <td>
+                  {% if v.recognized_model and v.recognized_model|lower == v.registered_vehicle.model|lower %}
+                    <i class="fa-solid fa-circle-check text-success"></i>
+                  {% else %}
+                    <i class="fa-solid fa-circle-xmark text-danger"></i>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td>Colour</td>
+                <td>{{ v.registered_vehicle.colour }}</td>
+                <td>{{ v.recognized_colour }}</td>
+                <td>
+                  {% if v.recognized_colour and v.recognized_colour|lower == v.registered_vehicle.colour|lower %}
+                    <i class="fa-solid fa-circle-check text-success"></i>
+                  {% else %}
+                    <i class="fa-solid fa-circle-xmark text-danger"></i>
+                  {% endif %}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          {% endif %}
 
           <p class="fw-bold">{{ v.message }}</p>
 
@@ -153,6 +319,8 @@
               <td>
                 {% if v.recognition_method == 'trained_model' %}
                   <span class="badge badge-clear">Trained MobileNetV2 model</span>
+                {% elif v.recognition_method == 'manual' %}
+                  <span class="badge badge-unregistered">Officer manual entry</span>
                 {% else %}
                   <span class="badge badge-unregistered">Placeholder (no trained model yet)</span>
                 {% endif %}
@@ -161,7 +329,7 @@
             {% endif %}
             {% else %}
             <tr><th>Recognized Vehicle</th>
-              <td class="text-muted"><i class="fa-solid fa-camera-slash"></i> Not captured — no photo taken (manual entry)</td>
+              <td class="text-muted"><i class="fa-solid fa-camera-slash"></i> Not captured — no photo taken and no attributes entered (plate-only check)</td>
             </tr>
             {% endif %}
             {% if gps_lat and gps_lon %}

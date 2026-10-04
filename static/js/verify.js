@@ -238,3 +238,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Run once on initial page load in case the server rendered results.
     processScanResultsForAlerts();
 });
+
+// CORRECTION 2 (HND project): reveal a free-text box only when the
+// officer picks "Other" for a manual-entry attribute, so uncommon
+// makes/models/colours never get silently forced into the wrong bucket.
+function wireOtherToggle(selectId, inputId) {
+  const select = document.getElementById(selectId);
+  const input = document.getElementById(inputId);
+  if (!select || !input) return;
+  select.addEventListener('change', function () {
+    if (select.value === '__other__') {
+      input.classList.remove('d-none');
+      input.required = true;
+    } else {
+      input.classList.add('d-none');
+      input.required = false;
+      input.value = '';
+    }
+  });
+}
+wireOtherToggle('manual_make', 'manual_make_other');
+wireOtherToggle('manual_model', 'manual_model_other');
+wireOtherToggle('manual_colour', 'manual_colour_other');

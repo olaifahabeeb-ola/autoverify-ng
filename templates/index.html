@@ -111,6 +111,28 @@
     </div>
   </div>
 </div>
+<!-- CORRECTION 1 (HND project): mismatch detection is this project's
+     headline topic, so this summary leads with it — CLEAR / MISMATCH /
+     STOLEN breakdown for today, mismatch shown first and largest. -->
+<div class="av-card mb-4">
+  <div class="card-header"><i class="fa-solid fa-magnifying-glass-chart"></i> Recognition Summary — Today</div>
+  <div class="card-body">
+    <div class="row g-3 text-center">
+      <div class="col-4">
+        <div class="recog-summary-figure text-warning">{{ mismatches_today }}</div>
+        <div class="text-muted small text-uppercase">Mismatches</div>
+      </div>
+      <div class="col-4">
+        <div class="recog-summary-figure text-success">{{ clear_today }}</div>
+        <div class="text-muted small text-uppercase">Clear</div>
+      </div>
+      <div class="col-4">
+        <div class="recog-summary-figure text-danger">{{ stolen_today }}</div>
+        <div class="text-muted small text-uppercase">Stolen</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="av-card">
   <div class="card-header"><i class="fa-solid fa-clock-rotate-left"></i> Recent Scan Logs</div>

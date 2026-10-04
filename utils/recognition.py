@@ -41,7 +41,6 @@ import base64
 import json
 import logging
 import os
-import random
 
 import numpy as np
 import cv2
@@ -67,6 +66,10 @@ _COLOUR_PALETTE_BGR = {
     "green":  (60, 160, 60),
     "yellow": (30, 220, 230),
     "brown":  (35, 65, 100),
+    "purple": (130, 40, 90),
+    "orange": (20, 110, 230),
+    "gold":   (30, 180, 210),
+    "maroon": (30, 20, 100),
 }
 
 _classifier_model = None
@@ -150,26 +153,61 @@ def _dominant_bgr(image, k=3, sample_region=None):
 
 
 def _nearest_colour_name(bgr):
-    best_name, best_dist = "unknown", float("inf")
-    for name, ref in _COLOUR_PALETTE_BGR.items():
-        dist = sum((a - b) ** 2 for a, b in zip(bgr, ref))
-        if dist < best_dist:
-            best_dist = dist
-            best_name = name
-    return best_name
+    """
+    HSV-based colour classification instead of raw BGR distance. Hue (what
+    colour it is) and brightness/saturation (how dark/washed-out it is)
+    are handled separately, since raw BGR distance incorrectly treats
+    dark saturated colours (e.g. dark purple) as close to black -- they
+    have similarly low numeric values even though they look clearly
+    different to the eye.
+    """
+    pixel = np.uint8([[list(bgr)]])
+    h, s, v = cv2.cvtColor(pixel, cv2.COLOR_BGR2HSV)[0][0]
 
+    if v < 60:
+        return "black"
+    if s < 40:
+        if v > 200:
+            return "white"
+        elif v > 140:
+            return "silver"
+        else:
+            return "grey"
+
+    if h < 8 or h >= 170:
+        return "red"
+    elif h < 20:
+        return "orange"
+    elif h < 35:
+        return "gold"
+    elif h < 85:
+        return "green"
+    elif h < 130:
+        return "blue"
+    elif h < 160:
+        return "purple"
+    else:
+        return "red"
 
 def detect_colour(image):
     """
-    Returns a named colour string (e.g. "white", "black", "red") detected
-    from the centre 60% of the frame, where the vehicle body is most
-    likely to dominate the pixels (avoiding road/sky at the edges).
+    Returns a named colour string detected from a horizontal band in the
+    middle of the frame's vertical range, avoiding the very top (often
+    windshield/rear glass, frequently reflecting bright sky) and the very
+    bottom (bumper chrome and the plate itself) -- both of which skew
+    k-means toward a false bright/neutral "silver" or "grey" result
+    regardless of the vehicle's actual paint colour.
     """
     h, w = image.shape[:2]
-    cx, cy = int(w * 0.2), int(h * 0.2)
-    cw, ch = int(w * 0.6), int(h * 0.6)
+    cy = int(h * 0.35)
+    ch = int(h * 0.30)
+    cx = int(w * 0.15)
+    cw = int(w * 0.70)
     dominant_bgr = _dominant_bgr(image, k=3, sample_region=(cx, cy, cw, ch))
-    return _nearest_colour_name(dominant_bgr)
+    logger.info("Colour detection: sample_region=(%d,%d,%d,%d) dominant_bgr=%s", cx, cy, cw, ch, dominant_bgr)
+    result = _nearest_colour_name(dominant_bgr)
+    logger.info("Colour detection result: %s", result)
+    return result
 
 
 # --------------------------------------------------------------------------
@@ -274,12 +312,12 @@ def recognize_vehicle(image_source=None, bbox=None):
     image = _decode_image(image_source)
 
     if image is None:
-        logger.warning("No usable image for recognition -- using placeholder values.")
+        logger.warning("No usable image for recognition -- no attributes recognized.")
         return {
-            "make": random.choice(_FALLBACK_MAKES),
-            "model": random.choice(_FALLBACK_MODELS),
-            "colour": random.choice(list(_COLOUR_PALETTE_BGR.keys())),
-            "method": "placeholder_fallback",
+            "make": None,
+            "model": None,
+            "colour": None,
+            "method": "no_image",
         }
 
     region = image
@@ -296,8 +334,7 @@ def recognize_vehicle(image_source=None, bbox=None):
         make, model = classification
         method = "trained_model"
     else:
-        make = random.choice(_FALLBACK_MAKES)
-        model = random.choice(_FALLBACK_MODELS)
-        method = "placeholder_fallback"
+        make, model = None, None
+        method = "untrained"
 
     return {"make": make, "model": model, "colour": colour, "method": method}

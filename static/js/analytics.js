@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return `range=${range}`;
   }
 
-  window.loadAnalytics = function loadAnalytics() {
+  function loadAnalytics() {
     fetch(`/api/analytics-stats?${buildQuery()}`)
       .then(r => r.json())
       .then(data => {
@@ -50,41 +50,28 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderOfficerPerformance(rows) {
     const tbody = document.getElementById('officer-performance-body');
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No scans in this range.</td></tr>';
+      tbody.innerHTML = 'No scans in this range.';
       return;
     }
-    tbody.innerHTML = rows.map(r => `
-      <tr>
-        <td>${r.officer}</td>
-        <td>${r.total_scans}</td>
-        <td>${r.mismatches}</td>
-        <td>${r.stolen_recoveries}</td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = rows.map(r => ` <tr> <td>${r.officer}</td> <td>${r.total_scans}</td> <td>${r.mismatches}</td> <td>${r.stolen_recoveries}</td> </tr> `).join('');
   }
 
   function renderRecentScans(rows) {
     const tbody = document.getElementById('recent-scans-body');
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No scans in this range.</td></tr>';
+      tbody.innerHTML = 'No scans in this range.';
       return;
     }
     const badgeFor = (status) => {
-      if (status === 'stolen') return '<span class="badge badge-stolen">STOLEN</span>';
-      if (status === 'mismatch') return '<span class="badge badge-mismatch">MISMATCH</span>';
-      return '<span class="badge badge-clear">CLEAR</span>';
+      if (status === 'stolen') return '<span class="badge badge-stolen">\nSTOLEN\n</span>';
+      if (status === 'mismatch') return '<span class="badge badge-mismatch">\nMISMATCH\n</span>';
+      return '<span class="badge badge-clear">\nCLEAR\n</span>';
     };
-    tbody.innerHTML = rows.map(r => `
-      <tr>
-        <td>${r.timestamp}</td>
-        <td>${r.plate_number}</td>
-        <td>${r.officer}</td>
-        <td>${badgeFor(r.status)}</td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = rows.map(r => ` <tr> <td>${r.timestamp}</td> <td>${r.plate_number}</td> <td>${r.officer}</td> <td>${badgeFor(r.status)}</td> </tr> `).join('');
   }
 
   function renderCharts(data) {
+    // Daily scans (bar)
     if (dailyScansChart) dailyScansChart.destroy();
     dailyScansChart = new Chart(document.getElementById('dailyScansChart'), {
       type: 'bar',
@@ -92,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
       options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
     });
 
+    // Mismatches by make (horizontal bar)
     if (mismatchByMakeChart) mismatchByMakeChart.destroy();
     mismatchByMakeChart = new Chart(document.getElementById('mismatchByMakeChart'), {
       type: 'bar',
@@ -99,13 +87,15 @@ document.addEventListener('DOMContentLoaded', () => {
       options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
     });
 
+    // Recovered stolen vehicles over time (line)
     if (recoveredChart) recoveredChart.destroy();
     recoveredChart = new Chart(document.getElementById('recoveredChart'), {
       type: 'line',
-      data: { labels: data.recovered_over_time.map(d => d.date), datasets: [{ label: 'Recovered', data: data.recovered_over_time.map(d => d.count), borderColor: '#2e7d32', backgroundColor: 'rgba(46,125,50,0.15)', tension: 0.3, fill: true }] },
+      data: { labels: data.recovered_over_time.map(d => d.date), datasets: [{ label: 'Recovered', data: data.recovered_over_time.map(d => d.count), borderColor: '#2e7d32', backgroundColor: 'rgba(46,125,50,0.15)', tension: 0.3, fill: true, }] },
       options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
     });
 
+    // Officer activity (bar)
     if (officerActivityChart) officerActivityChart.destroy();
     officerActivityChart = new Chart(document.getElementById('officerActivityChart'), {
       type: 'bar',
